@@ -18,6 +18,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:
         Data.Array.Repa.Distributed
+        Data.Array.Repa.Distributed.Remote
         Data.Array.Repa.Distributed.Config
   -- other-modules:       
   -- other-extensions:    
