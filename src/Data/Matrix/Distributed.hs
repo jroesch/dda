@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Data.Matrix.Distributed ()
-where
+module Data.Matrix.Distributed where
 
 import Data.Word
 import Data.Vector as V
@@ -59,14 +58,13 @@ sdAdd a b = (height><width) $ V.toList resV
       v <- M.new (height * width)
       CM.forM_ [0..height] $ \y -> CM.forM_ [0..width] $ \x -> write v (x + y*width) (b @@> (x,y))
       return v
-    resV = V.modify (\v -> H.forM_ sparse 
-                    (\(S.Key r c, val) -> (do
-                      let rr = fromIntegral r
-                      let cc = fromIntegral c
-                      vals <- M.read v (cc + rr * width)
-                      write v (cc + rr * width) (val + vals)
-                      return undefined -- somehow need to return (a,b) but it doesnt get used
-                    ))) dense
+    resV = V.modify mutableAdd dense
+    mutableAdd mv = (\action -> H.foldM action () sparse) $ \_ (S.Key r c, val) -> do
+      let rr = fromIntegral r
+      let cc = fromIntegral c
+      vals <- M.read mv (cc + rr * width)
+      write mv (cc + rr * width) (val + vals)
+      return ()
 
 -- sparse matrix based on peano ordering
 --                   top left   top right  bottom left bottom right
