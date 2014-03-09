@@ -59,7 +59,8 @@ sdAdd a b = (height><width) $ V.toList resV
       v <- M.new (height * width)
       CM.forM_ [0..height] $ \y -> CM.forM_ [0..width] $ \x -> write v (x + y*width) (b @@> (x,y))
       return v
-    resV = V.modify (\v -> H.forM_ sparse (\(S.Key r c, val) -> (do
+    resV = V.modify (\v -> H.forM_ sparse 
+                    (\(S.Key r c, val) -> (do
                       let rr = fromIntegral r
                       let cc = fromIntegral c
                       vals <- M.read v (cc + rr * width)
