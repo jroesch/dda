@@ -11,7 +11,7 @@ import qualified Sparse.Matrix as S
 import qualified Data.Packed as D
 import Foreign.Storable
 import Numeric.Container
-import Control.Monad
+import Control.Monad as CM
 import Control.Lens
 
 {-
@@ -48,12 +48,18 @@ matAdd m1@(SMat width1 height1 vm1) m2@(SMat width2 height2 vm2) =
 sdMul :: (Num a, S.Eq0 a, Storable a) => S.Mat a -> D.Matrix a -> S.Mat a
 sdMul a b = a & S._Mat %~ H.map (\(S.Key r c, d) -> (S.Key r c, d * (b @@> (fromIntegral r, fromIntegral c))))
 
+-- TODO: am i accidentaly transposing
 sdAdd :: (Num a, S.Eq0 a, Storable a) => S.Mat a -> D.Matrix a -> D.Matrix a
-sdAdd a b = V.modify (\v -> H.forM_ sparse (\(S.Key r c, val) -> write v (c + r * width) val + (v V.! c + r * width)))
+sdAdd a b = (height><width) $ V.toList resV
   where
     sparse = a ^. S._Mat
-    -- D.Matrix width height dense order = b -- TODO: handle matrix order
-    D.Matrix { irows=width, icols = height, xdat = dense , order = oder } = b
+    width = cols b
+    height = rows b
+    dense = V.create $ do
+      v <- new (height * width)
+      CM.forM_ [0..height] $ \y -> CM.forM_ [0..width] $ \x -> write v (x + y*width) b @@> (x,y)
+      v
+    resV = V.modify (\v -> H.forM_ sparse (\(S.Key r c, val) -> write v (c + r * width) (val + (v V.! c + r * width)))) dense
 
 -- sparse matrix based on peano ordering
 --                   top left   top right  bottom left bottom right
