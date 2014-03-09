@@ -56,10 +56,16 @@ sdAdd a b = (height><width) $ V.toList resV
     width = cols b
     height = rows b
     dense = V.create $ do
-      v <- new (height * width)
-      CM.forM_ [0..height] $ \y -> CM.forM_ [0..width] $ \x -> write v (x + y*width) b @@> (x,y)
-      v
-    resV = V.modify (\v -> H.forM_ sparse (\(S.Key r c, val) -> write v (c + r * width) (val + (v V.! c + r * width)))) dense
+      v <- M.new (height * width)
+      CM.forM_ [0..height] $ \y -> CM.forM_ [0..width] $ \x -> write v (x + y*width) (b @@> (x,y))
+      return v
+    resV = V.modify (\v -> H.forM_ sparse (\(S.Key r c, val) -> (do
+                      let rr = fromIntegral r
+                      let cc = fromIntegral c
+                      vals <- M.read v (cc + rr * width)
+                      write v (cc + rr * width) (val + vals)
+                      return undefined -- somehow need to return (a,b) but it doesnt get used
+                    ))) dense
 
 -- sparse matrix based on peano ordering
 --                   top left   top right  bottom left bottom right
