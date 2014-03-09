@@ -29,6 +29,7 @@ library
         attoparsec,
         bytestring,
         containers,
+        distribute,
         repa
   hs-source-dirs: src  
   default-language:
