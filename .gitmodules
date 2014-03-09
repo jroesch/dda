@@ -1,3 +1,6 @@
 [submodule "distribute"]
 	path = distribute
 	url = https://github.com/jroesch/distribute.git
+[submodule "sparse"]
+	path = sparse
+	url = https://github.com/jroesch/sparse/
