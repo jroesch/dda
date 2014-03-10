@@ -12,6 +12,7 @@ import Foreign.Storable
 import Numeric.Container
 import Control.Monad as CM
 import Control.Lens
+import qualified Distribute as DT
 
 {-
 --                 width height mat
@@ -67,41 +68,47 @@ sdAdd a b = (height><width) $ V.toList resV
       return ()
 
 -- sparse matrix based on peano ordering
---                   top left   top right  bottom left bottom right
-data PSMat a = PNode !(PSMat a) !(PSMat a) !(PSMat a) !(PSMat a)
-             | Dense (D.Matrix a)
-             | Sparse (S.Mat a)
-             | Zero
-  deriving (Show)
+--                  top left   top right  bottom left bottom right
+data DMat a = Node !(DMat a) !(DMat a) !(DMat a) !(DMat a)
+            | Remote DT.PID
+            | Dense (D.Matrix a)
+            | Sparse (S.Mat a)
+            | Zero
+            deriving (Show)
 
-sMatAdd :: (S.Eq0 a, Num a, Container Matrix a) => PSMat a -> PSMat a -> PSMat a
-sMatAdd a b = case (a, b) of
+sadd :: (S.Eq0 a, Num a, Container Matrix a) => DMat a -> DMat a -> DMat a
+sadd a b = case (a, b) of
                 (Zero, r) -> r
                 (l, Zero) -> l
                 (Sparse left, Sparse right) -> Sparse $ left + right
                 (Dense left, Dense right) -> Dense $ left `add` right
-                (PNode l1 l2 l3 l4, PNode r1 r2 r3 r4) -> PNode (sMatAdd l1 r1)
-                                                                (sMatAdd l2 r2)
-                                                                (sMatAdd l3 r3)
-                                                                (sMatAdd l4 r4)
+                (Node l1 l2 l3 l4, Node r1 r2 r3 r4) -> Node (sadd l1 r1)
+                                                             (sadd l2 r2)
+                                                             (sadd l3 r3)
+                                                             (sadd l4 r4)
                 (Sparse left, Dense right) -> Dense $ sdAdd left right
-                (Dense left, Sparse right) -> Dense $ (flip sdAdd) left right
+                (Dense right, Sparse left) -> Dense $ sdAdd left right
                 otherwise -> Zero
 
 
-sMatMul :: (S.Eq0 a, Num a, Product a, Container Matrix a) => PSMat a -> PSMat a -> PSMat a
-sMatMul a b = case (a, b) of
+smult :: (S.Eq0 a, Num a, Product a, Container Matrix a) => DMat a -> DMat a -> DMat a
+smult a b = case (a, b) of
                 (Zero, _) -> Zero
                 (_, Zero) -> Zero
                 (Sparse left, Sparse right) -> Sparse $ left * right
                 (Dense left, Dense right) -> Dense $ left `multiply` right
-                (PNode l1 l2 l3 l4, PNode r1 r2 r3 r4) -> PNode (sMatAdd (sMatMul l1 r1) (sMatMul l2 r3))
-                                                                (sMatAdd (sMatMul l1 r2) (sMatMul l2 r4))
-                                                                (sMatAdd (sMatMul l3 r1) (sMatMul l4 r3))
-                                                                (sMatAdd (sMatMul l3 r2) (sMatMul l4 r4))
+                (Node l1 l2 l3 l4, Node r1 r2 r3 r4) -> Node (sadd (smult l1 r1) (smult l2 r3))
+                                                             (sadd (smult l1 r2) (smult l2 r4))
+                                                             (sadd (smult l3 r1) (smult l4 r3))
+                                                             (sadd (smult l3 r2) (smult l4 r4))
                 (Sparse left, Dense right) -> Sparse $ sdMul left right
                 (Dense left, Sparse right) -> Sparse $ (flip sdMul) left right
                 otherwise -> Zero -- TODO: fix
+
+
+dmult :: DMat a -> DMat a -> DMat a
+dmult Zero Zero = Zero
+dmult _ _ = undefined
 
 {-
 -- distributed sparse matrix
@@ -110,3 +117,5 @@ data DPSMat a = DPSMat !Word !Word (PSMat a)
 -- distributed matrix multiply
 dMalMut 
 -}
+
+
