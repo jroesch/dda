@@ -3,6 +3,7 @@
 module Data.Matrix.Distributed where
 
 import Data.Word
+import Data.Bits
 import Data.Vector as V
 import Data.Vector.Mutable as M
 import Data.Vector.Hybrid as H
@@ -12,6 +13,7 @@ import Foreign.Storable
 import Numeric.Container
 import Control.Monad as CM
 import Control.Lens
+import Distribute (DMat, Distribute)
 import qualified Distribute as DT
 
 {-
@@ -69,29 +71,29 @@ sdAdd a b = (height><width) $ V.toList resV
 
 -- sparse matrix based on peano ordering
 --                  top left   top right  bottom left bottom right
-data DMat a = Node !(DMat a) !(DMat a) !(DMat a) !(DMat a)
+data DMat a = Node !Int !(DMat a) !(DMat a) !(DMat a) !(DMat a)
             | Remote DT.PID
             | Dense (D.Matrix a)
             | Sparse (S.Mat a)
             | Zero
             deriving (Show)
 
-sadd :: (S.Eq0 a, Num a, Container Matrix a) => DMat a -> DMat a -> DMat a
+{- sadd :: (S.Eq0 a, Num a, Container Matrix a) => DMat a -> DMat a -> DMat a
 sadd a b = case (a, b) of
                 (Zero, r) -> r
                 (l, Zero) -> l
                 (Sparse left, Sparse right) -> Sparse $ left + right
                 (Dense left, Dense right) -> Dense $ left `add` right
-                (Node l1 l2 l3 l4, Node r1 r2 r3 r4) -> Node (sadd l1 r1)
+                (Node _ l1 l2 l3 l4, Node _ r1 r2 r3 r4) -> Node (sadd l1 r1)
                                                              (sadd l2 r2)
                                                              (sadd l3 r3)
                                                              (sadd l4 r4)
                 (Sparse left, Dense right) -> Dense $ sdAdd left right
                 (Dense right, Sparse left) -> Dense $ sdAdd left right
-                otherwise -> Zero
+                otherwise -> Zero -}
 
 
-smult :: (S.Eq0 a, Num a, Product a, Container Matrix a) => DMat a -> DMat a -> DMat a
+{- smult :: (S.Eq0 a, Num a, Product a, Container Matrix a) => DMat a -> DMat a -> DMat a
 smult a b = case (a, b) of
                 (Zero, _) -> Zero
                 (_, Zero) -> Zero
@@ -103,19 +105,50 @@ smult a b = case (a, b) of
                                                              (sadd (smult l3 r2) (smult l4 r4))
                 (Sparse left, Dense right) -> Sparse $ sdMul left right
                 (Dense left, Sparse right) -> Sparse $ (flip sdMul) left right
-                otherwise -> Zero -- TODO: fix
+                otherwise -> Zero -- TODO: fix -}
 
+-- current assumption that the matrix is square is bad
 
-dmult :: DMat a -> DMat a -> DMat a
-dmult Zero Zero = Zero
-dmult _ _ = undefined
+fromSparse :: S.Mat a -> DMat a
+fromSparse = undefined
 
-{-
--- distributed sparse matrix
-data DPSMat a = DPSMat !Word !Word (PSMat a)
+dmult :: DMat a -> DMat a -> Distribute (DMat a) DMat a
+dmult (Node m1 tl1 tr1 bl1 br1) (Node m2 tl2 tr2 bl2 br2) = do
+  when ((m1 .&. m2) /= 0) error "Wrong" -- assert this
+  nodeMult m1 tl1 tr1 bl1 br1 tl2 tr2 bl2 br2
+dmult (Node _ _ _ _ _) _ =
+  error "Internal error: fuck andrew berls"
+dmult _ (Node _ _ _ _ _) =
+  error "Internal error: fuck pete cruz"
+dmult Zero _ =
+  Zero
+dmult _ Zero =
+  Zero
+dmult (Remote pid) mat =
+    remoteMult pid mat
+dmult mat (Remote pid) =
+    remoteMult pid mat
+dmult (Sparse smat) (Dense dmat) =
+    return $ Sparse (sdMult smat dmat)
+dmult (Dense dmat) (Sparse smat) =
+    return $ Sparse (sdMult smat dmat)
+    remoteMult pid mat
+  where remoteMult pid mat = do
+          requestMatrix
+          rmat <- DT.readFrom pid
+          dmult rmat mat
 
--- distributed matrix multiply
-dMalMut 
--}
+        nodeMult tl tr bl br tl' tr' bl' br' = do
+          topLeft <- applyOrId (firstQ mask) tl' (dmult tl)
+          topRight <- applyOrId (secondQ mask) tr' (dmult tr)
+          bottomLeft <- applyOrId (thirdQ mask) bl' (dmult bl)
+          bottomRight <- applyOrId (fourthQ mask) br' (dmult br)
+          return (Node mask topLeft topRight bottomLeft bottomRight)
 
+        applyOrId False a _ = a
+        applyOrId True  a f = f a
 
+        firstQ m = (m .&. 1) == 1
+        secondQ m = (m .&. 13) == 1
+        thirdQ m = (m .&. 11) == 1
+        fourthQ m = (m .&. 8) == 1
