@@ -49,6 +49,15 @@ matAdd m1@(SMat width1 height1 vm1) m2@(SMat width2 height2 vm2) =
     return $ SMat width1 height1 $ V.zipWith (+) vm1 vm2
 -}
 
+opOnNonZeros :: (a -> b) -> DMat a -> DMat b
+opOnNonSeros op mat = case mat of
+                        Concrete (Dense smat) -> Concrete $ D.mapMatrix op smat
+                        Concrete (Sparse smat) -> Concrete $ smat & S._Mat %~ H.map (op . snd)
+                        Concrete Zero -> Concrete Zero
+                        Remote pid -> Remote pid
+                        DMat tl tr bl br = DMat (opOnNonZeros tl) (opOnNonZeros tr)
+                                                (opOnNonZeros bl) (opOnNonZeros br)
+
 sdMult :: (Num a, S.Eq0 a, Storable a) => S.Mat a -> D.Matrix a -> S.Mat a
 sdMult a b = a & S._Mat %~ H.map (\(S.Key r c, d) -> (S.Key r c, d * (b @@> (fromIntegral r, fromIntegral c))))
 
