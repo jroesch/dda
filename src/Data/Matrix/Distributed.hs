@@ -49,14 +49,25 @@ matAdd m1@(SMat width1 height1 vm1) m2@(SMat width2 height2 vm2) =
     return $ SMat width1 height1 $ V.zipWith (+) vm1 vm2
 -}
 
-opOnNonZeros :: (a -> b) -> DMat a -> DMat b
-opOnNonSeros op mat = case mat of
-                        Concrete (Dense smat) -> Concrete $ D.mapMatrix op smat
-                        Concrete (Sparse smat) -> Concrete $ smat & S._Mat %~ H.map (op . snd)
+opOnNonZeros :: (Storable a, S.Arrayed a) => (a -> a) -> DMat a -> DMat a
+opOnNonZeros op mat = case mat of
+                        Concrete (Dense smat) -> Concrete $ Dense $ D.mapMatrix op smat
+                        Concrete (Sparse smat) -> Concrete $ Sparse $ (smat & S._Mat %~ H.map (\(k, b) -> (k, op b)))
                         Concrete Zero -> Concrete Zero
                         Remote pid -> Remote pid
-                        DMat tl tr bl br = DMat (opOnNonZeros tl) (opOnNonZeros tr)
-                                                (opOnNonZeros bl) (opOnNonZeros br)
+                        DMat mask tl tr bl br -> DMat mask (opOnNonZeros op tl) (opOnNonZeros op tr)
+                                                           (opOnNonZeros op bl) (opOnNonZeros op br)
+
+transpose :: (S.Arrayed a) => DMat a -> DMat a
+transpose mat = case mat of
+                  Concrete (Dense smat) -> Concrete $ Dense $ D.trans smat
+                  Concrete (Sparse smat) -> Concrete $ Sparse $ S.transpose smat
+                  Concrete Zero -> Concrete Zero
+                  Remote pid -> Remote pid
+                  DMat mask tl tr bl br -> DMat (mask' mask) (transpose tl) (transpose bl)
+                                                          (transpose tr) (transpose br)
+  where
+    mask' m = (m .&. 1) + (m .&. 8) + (if thirdQ m then 1 else 0)*2 + (if secondQ m then 1 else 0)*4
 
 sdMult :: (Num a, S.Eq0 a, Storable a) => S.Mat a -> D.Matrix a -> S.Mat a
 sdMult a b = a & S._Mat %~ H.map (\(S.Key r c, d) -> (S.Key r c, d * (b @@> (fromIntegral r, fromIntegral c))))
@@ -155,6 +166,6 @@ ternary False a _ = a
 ternary True  _ b = b
 
 firstQ m = (m .&. 1) == 1
-secondQ m = (m .&. 13) == 1
-thirdQ m = (m .&. 11) == 1
-fourthQ m = (m .&. 8) == 1
+secondQ m = (m .&. 2) == 2
+thirdQ m = (m .&. 4) == 4
+fourthQ m = (m .&. 8) == 8
