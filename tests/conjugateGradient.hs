@@ -1,3 +1,6 @@
+import Data.Matrix.Types
+import Data.Matrix.Distributed
+
 conjugateGradient mat b = do
     norm <- (transpose b) .* b
     let x = zeros (height b)
