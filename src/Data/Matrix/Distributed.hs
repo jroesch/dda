@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction #-}
 module Data.Matrix.Distributed where
 
 import Control.Applicative
@@ -69,12 +69,15 @@ transpose mat = case mat of
   where
     mask' m = (m .&. 1) + (m .&. 8) + (if thirdQ m then 1 else 0)*2 + (if secondQ m then 1 else 0)*4
 
-sdMult :: (Num a, S.Eq0 a, Storable a) => S.Mat a -> D.Matrix a -> S.Mat a
-sdMult a b = a & S._Mat %~ H.map (\(S.Key r c, d) -> (S.Key r c, d * (b @@> (fromIntegral r, fromIntegral c))))
+-- sparse-dense elementwise multiply zero * somehting = zero
+-- resulting array is sparse
+sdMult :: (Num a, S.Eq0 a, Storable a) => (a -> a -> a) -> S.Mat a -> D.Matrix a -> S.Mat a
+sdMult op a b = a & S._Mat %~ H.map (\(S.Key r c, d) -> (S.Key r c, d `op` (b @@> (fromIntegral r, fromIntegral c))))
 
 -- TODO: am i accidentaly transposing
-sdAdd :: (Num a, S.Eq0 a, Storable a) => S.Mat a -> D.Matrix a -> D.Matrix a
-sdAdd a b = (height><width) $ V.toList resV
+-- sparse-desnse add yields dense (we assume not too many zeros are created)
+sdAdd :: (Num a, S.Eq0 a, Storable a) => (a -> a -> a) -> S.Mat a -> D.Matrix a -> D.Matrix a
+sdAdd op a b = (height><width) $ V.toList resV
   where
     sparse = a ^. S._Mat
     width = cols b
@@ -88,7 +91,7 @@ sdAdd a b = (height><width) $ V.toList resV
       let rr = fromIntegral r
       let cc = fromIntegral c
       vals <- M.read mv (cc + rr * width)
-      write mv (cc + rr * width) (val + vals)
+      write mv (cc + rr * width) (val `op` vals)
       return ()
 
 sadd :: (S.Eq0 a, Num a, Container Matrix a) => CMat a -> CMat a -> CMat a
@@ -99,9 +102,9 @@ sadd (Sparse left) (Sparse right) =
 sadd (Dense left) (Dense right) =
     Dense $ left `add` right
 sadd (Sparse left) (Dense right) =
-    Dense $ sdAdd left right
+    Dense $ sdAdd (+) left right
 sadd (Dense right) (Sparse left) =
-    Dense $ sdAdd left right
+    Dense $ sdAdd (+) left right
 
 
 smult :: (S.Eq0 a, Num a, Product a, Container Matrix a) => CMat a -> CMat a -> CMat a
@@ -112,9 +115,9 @@ smult (Sparse left) (Sparse right) =
 smult (Dense left) (Dense right) =
   Dense $ left `multiply` right
 smult (Sparse left) (Dense right) =
-  Sparse $ sdMult left right
+  Sparse $ sdMult (*) left right
 smult (Dense left) (Sparse right) =
-  Sparse $ (flip sdMult) left right
+  Sparse $ (flip (sdMult (*))) left right
 
 fromSparse :: [a] -> DMat a
 fromSparse = undefined
@@ -137,6 +140,49 @@ dadd (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
   bl <- ternary (thirdQ mask) (return l3) (dadd l3 r3)
   br <- ternary (fourthQ mask) (return l4) (dadd l4 r4)
   return $ DMat mask tl tr bl br
+
+-- elementwise operations
+
+-- elementwise add on semiring, can result in zeros
+eadd :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Storable (a, a)) => (a -> a -> a) -> CMat a -> CMat a -> CMat a
+eadd op a b = case (a, b) of
+                 (Sparse sa, Sparse sb) -> Sparse $ S.addWith0 (S.nonZero op) sa sb
+                 (Dense da,  Dense db)  -> Dense $ D.liftMatrix2 (\v1 v2 -> mapVector (\(a1, a2) -> op a1 a2) (zipVector v1 v2)) da db
+                 (Dense da,  Sparse sb) -> Dense $ sdAdd op sb da
+                 (Sparse sa, Dense db)  -> Dense $ sdAdd op sa db
+                 (Zero,      other)     -> other
+                 (other,     Zero)      -> other
+
+edadd :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Storable (a, a)) => (a -> a -> a) -> DMat a -> DMat a -> DMat a
+edadd op a b = case (a, b) of
+                 (Concrete a, Concrete b) -> Concrete $ eadd op a b
+                 (Remote a,   Remote b)   -> Remote a
+                 (DMat mask a1 a2 a3 a4, DMat mask' b1 b2 b3 b4) -> DMat mask (edadd op a1 b1) (edadd op a2 b2)
+                                                                              (edadd op a3 b3) (edadd op a4 b4)
+
+(^+) =  edadd (+)
+(^-) =  edadd (-)
+
+-- elementwise multiply on semiring, multiplication by zero = zero
+emult :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Storable (a, a)) => (a -> a -> a) -> CMat a -> CMat a -> CMat a
+emult op a b = case (a, b) of
+                 (Sparse sa, Sparse sb) -> Sparse $ S.elementMultiplyWith op sa sb
+                 (Dense da,  Dense db)  -> Dense $ D.liftMatrix2 (\v1 v2 -> mapVector (\(a1, a2) -> op a1 a2) (zipVector v1 v2)) da db
+                 (Dense da,  Sparse sb) -> Sparse $ sdMult op sb da
+                 (Sparse sa, Dense db)  -> Sparse $ sdMult op sa db
+                 (Zero,      other)     -> other
+                 (other,     Zero)      -> other
+
+(^*) = emult (*)
+
+edmult :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Storable (a, a)) => (a -> a -> a) -> DMat a -> DMat a -> DMat a
+edmult op a b = case (a, b) of
+                 (Concrete a, Concrete b) -> Concrete $ emult op a b
+                 (Remote a,   Remote b)   -> Remote a
+                 (DMat mask a1 a2 a3 a4, DMat mask' b1 b2 b3 b4) -> DMat mask (edmult op a1 b1) (edmult op a2 b2)
+                                                                              (edmult op a3 b3) (edmult op a4 b4)
+
+(.*) = dmult
 
 dmult :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Product a) =>
       DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
