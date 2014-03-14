@@ -1,9 +1,10 @@
-{-# LANGUAGE DeriveGeneric, DefaultSignatures, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric, DefaultSignatures, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies, UndecidableInstances, OverlappingInstances, ScopedTypeVariables #-}
 module Data.Matrix.Types
   ( DMat(..)
   , CMat(..)
   , DMatMessage(..)
+  , MElement
   ) where
 
 import Distribute as DT
@@ -16,9 +17,14 @@ import Data.Packed.Development (MatrixOrder(..))
 import qualified Data.Serialize as Cereal
 import qualified Data.Vector.Serialize
 import Foreign.Storable
+import Numeric.Container
 import Control.Monad
 import Control.Monad.ST
 import GHC.Generics
+
+-- | Package Matrix element constraints into a convienence class.
+class (Cereal.Serialize a, Num a, S.Eq0 a, Storable a, Container Matrix a, Product a) => MElement a
+instance (Cereal.Serialize a, Num a, S.Eq0 a, Storable a, Container Matrix a, Product a) => MElement a
 
 {- instance Cereal.Serialize a => (Cereal.Serialize (S.Arr a a)) where
   get = undefined
@@ -78,14 +84,20 @@ instance (Cereal.Serialize a, D.Element a)  => (Cereal.Serialize (CMat a))
 
 -- | A distributed matrix
 data DMat a = DMat !Int !(DMat a) !(DMat a) !(DMat a) !(DMat a)
-            | Remote DT.PID
+            | Remote DT.PID Int
             | Concrete (CMat a)
             deriving (Show, Generic)
 
 instance (Cereal.Serialize a, D.Element a)  => (Cereal.Serialize (DMat a))
 
-data DMatMessage a = Request (DMat a)
+data Q = A | B | C | D deriving (Eq, Show, Generic)
+
+instance Cereal.Serialize Q
+
+data DMatMessage a = Request PID Int
                    | Response (DMat a)
+                   | Sync
+                   | Finish
                    deriving (Generic)
 
 instance (Cereal.Serialize a, D.Element a) => (Cereal.Serialize (DMatMessage a))

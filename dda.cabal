@@ -35,7 +35,9 @@ library
         hybrid-vectors,
         vector,
         cereal,
-        cereal-vector
+        cereal-vector,
+        mtl,
+        transformers
   hs-source-dirs: src
   default-language:
         Haskell2010

@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction #-}
+{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction, FlexibleInstances, UndecidableInstances #-}
 module Data.Matrix.Distributed where
 
 import Control.Applicative
@@ -17,6 +17,9 @@ import Control.Lens
 import Distribute (Distribute)
 import qualified Distribute as DT
 import qualified Data.Serialize as Cereal
+import qualified Control.Monad.State as S
+import Control.Monad.Trans (lift)
+import Control.Concurrent
 
 {-
 --                 width height mat
@@ -50,22 +53,23 @@ matAdd m1@(SMat width1 height1 vm1) m2@(SMat width2 height2 vm2) =
 -}
 
 opOnNonZeros :: (Storable a, S.Arrayed a) => (a -> a) -> DMat a -> DMat a
-opOnNonZeros op mat = case mat of
-                        Concrete (Dense smat) -> Concrete $ Dense $ D.mapMatrix op smat
-                        Concrete (Sparse smat) -> Concrete $ Sparse $ (smat & S._Mat %~ H.map (\(k, b) -> (k, op b)))
-                        Concrete Zero -> Concrete Zero
-                        Remote pid -> Remote pid
-                        DMat mask tl tr bl br -> DMat mask (opOnNonZeros op tl) (opOnNonZeros op tr)
-                                                           (opOnNonZeros op bl) (opOnNonZeros op br)
+opOnNonZeros op (Concrete (Dense smat)) = Concrete $ Dense $ D.mapMatrix op smat
+opOnNonZeros op (Concrete (Sparse smat)) =
+  Concrete $ Sparse $ (smat & S._Mat %~ H.map (\(k, b) -> (k, op b)))
+opOnNonZeros op (Concrete Zero) = Concrete Zero
+opOnNonZeros op (Remote pid quad) = Remote pid quad
+opOnNonZeros op (DMat mask tl tr bl br) =
+    DMat mask (opOnNonZeros op tl) (opOnNonZeros op tr)
+              (opOnNonZeros op bl) (opOnNonZeros op br)
 
 transpose :: (S.Arrayed a) => DMat a -> DMat a
-transpose mat = case mat of
-                  Concrete (Dense smat) -> Concrete $ Dense $ D.trans smat
-                  Concrete (Sparse smat) -> Concrete $ Sparse $ S.transpose smat
-                  Concrete Zero -> Concrete Zero
-                  Remote pid -> Remote pid
-                  DMat mask tl tr bl br -> DMat (mask' mask) (transpose tl) (transpose bl)
-                                                          (transpose tr) (transpose br)
+transpose (Concrete (Dense smat)) = Concrete $ Dense $ D.trans smat
+transpose (Concrete (Sparse smat)) = Concrete $ Sparse $ S.transpose smat
+transpose (Concrete Zero) = Concrete Zero
+transpose (Remote pid quad) = Remote pid quad
+transpose (DMat mask tl tr bl br) =
+    DMat (mask' mask) (transpose tl) (transpose bl)
+                      (transpose tr) (transpose br)
   where
     mask' m = (m .&. 1) + (m .&. 8) + (if thirdQ m then 1 else 0)*2 + (if secondQ m then 1 else 0)*4
 
@@ -94,7 +98,7 @@ sdAdd op a b = (height><width) $ V.toList resV
       write mv (cc + rr * width) (val `op` vals)
       return ()
 
-sadd :: (S.Eq0 a, Num a, Container Matrix a) => CMat a -> CMat a -> CMat a
+sadd :: MElement a => CMat a -> CMat a -> CMat a
 sadd Zero r = r
 sadd l Zero = l
 sadd (Sparse left) (Sparse right) =
@@ -106,8 +110,7 @@ sadd (Sparse left) (Dense right) =
 sadd (Dense right) (Sparse left) =
     Dense $ sdAdd (+) left right
 
-
-smult :: (S.Eq0 a, Num a, Product a, Container Matrix a) => CMat a -> CMat a -> CMat a
+smult :: MElement a => CMat a -> CMat a -> CMat a
 smult Zero _ = Zero
 smult _ Zero = Zero
 smult (Sparse left) (Sparse right) =
@@ -122,16 +125,43 @@ smult (Dense left) (Sparse right) =
 fromSparse :: [a] -> DMat a
 fromSparse = undefined
 
-requestMatrix = undefined
+requestMatrix :: MElement a => Int -> DT.PID -> Distribute (DMatMessage a) (DMat a)
+requestMatrix quad pid = do
+    let reqpid = 10
+    DT.sendTo pid (Request reqpid quad)
+    response <- DT.readFrom pid
+    case response of
+      Response res -> return res
+      _            -> error "communication error"
 
-dadd :: (Num a, S.Eq0 a, Storable a, Container Matrix a) => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
+
+sync :: MElement a => Distribute (DMatMessage a) ()
+sync = do
+    (_, reg) <- S.get
+    DT.broadcast Sync
+    procs <- S.lift $ DT.processes reg
+    count <- lift $ newMVar 0
+    CM.forM_ procs $ \p -> lift $ forkIO $ do
+      let loop Finish = undefined
+          loop Sync = undefined
+          loop (Request _ _) = undefined
+        in undefined
+    lift $ spin (undefined) count
+  where spin f mvar = do
+          r <- takeMVar mvar
+          if f r
+            then return ()
+            else spin f mvar
+
+
+dadd :: MElement a => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
 dadd (Concrete cmat1) (Concrete cmat2) =
     return $ Concrete $ sadd cmat1 cmat2
-dadd (Remote pid) mat = do
-    rmat <- requestMatrix
+dadd (Remote pid quad) mat = do
+    rmat <- requestMatrix pid quad
     dadd rmat mat
-dadd mat (Remote pid) = do
-    rmat <- requestMatrix
+dadd mat (Remote pid quad) = do
+    rmat <- requestMatrix pid quad
     dadd mat rmat
 dadd (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
   let mask = m1 .&. m2
@@ -144,21 +174,24 @@ dadd (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
 -- elementwise operations
 
 -- elementwise add on semiring, can result in zeros
-eadd :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Storable (a, a)) => (a -> a -> a) -> CMat a -> CMat a -> CMat a
-eadd op a b = case (a, b) of
-                 (Sparse sa, Sparse sb) -> Sparse $ S.addWith0 (S.nonZero op) sa sb
-                 (Dense da,  Dense db)  -> Dense $ D.liftMatrix2 (\v1 v2 -> mapVector (\(a1, a2) -> op a1 a2) (zipVector v1 v2)) da db
-                 (Dense da,  Sparse sb) -> Dense $ sdAdd op sb da
-                 (Sparse sa, Dense db)  -> Dense $ sdAdd op sa db
-                 (Zero,      other)     -> other
-                 (other,     Zero)      -> other
+eadd :: (MElement a, Storable (a, a)) => (a -> a -> a) -> CMat a -> CMat a -> CMat a
+eadd op (Sparse sa) (Sparse sb) =
+    Sparse $ S.addWith0 (S.nonZero op) sa sb
+eadd op (Dense da) (Dense db) =
+    Dense $ D.liftMatrix2 (\v1 v2 -> mapVector (\(a1, a2) -> op a1 a2) (zipVector v1 v2)) da db
+eadd op (Dense da) (Sparse sb) =
+    Dense $ sdAdd op sb da
+eadd op (Sparse sa) (Dense db) =
+  Dense $ sdAdd op sa db
+eadd op Zero other = other
+eadd op other Zero = other
 
-edadd :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Storable (a, a)) => (a -> a -> a) -> DMat a -> DMat a -> DMat a
-edadd op a b = case (a, b) of
-                 (Concrete a, Concrete b) -> Concrete $ eadd op a b
-                 (Remote a,   Remote b)   -> Remote a
-                 (DMat mask a1 a2 a3 a4, DMat mask' b1 b2 b3 b4) -> DMat mask (edadd op a1 b1) (edadd op a2 b2)
-                                                                              (edadd op a3 b3) (edadd op a4 b4)
+edadd :: (MElement a,  Storable (a, a)) => (a -> a -> a) -> DMat a -> DMat a -> DMat a
+edadd op (Concrete a) (Concrete b) = Concrete $ eadd op a b
+edadd op (Remote pid1 a) (Remote pid2 b) {- | pid1 == pid2 -} = Remote pid1 a
+edadd op (DMat mask a1 a2 a3 a4) (DMat mask' b1 b2 b3 b4) =
+    DMat mask (edadd op a1 b1) (edadd op a2 b2)
+              (edadd op a3 b3) (edadd op a4 b4)
 
 (^+) =  edadd (+)
 (^-) =  edadd (-)
@@ -176,23 +209,23 @@ emult op a b = case (a, b) of
 (^*) = emult (*)
 
 edmult :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Storable (a, a)) => (a -> a -> a) -> DMat a -> DMat a -> DMat a
-edmult op a b = case (a, b) of
-                 (Concrete a, Concrete b) -> Concrete $ emult op a b
-                 (Remote a,   Remote b)   -> Remote a
-                 (DMat mask a1 a2 a3 a4, DMat mask' b1 b2 b3 b4) -> DMat mask (edmult op a1 b1) (edmult op a2 b2)
-                                                                              (edmult op a3 b3) (edmult op a4 b4)
+edmult op (Concrete a) (Concrete b) = Concrete $ emult op a b
+edmult op (Remote pid1 a) (Remote pid2 b) = Remote pid1 a
+edmult op (DMat mask a1 a2 a3 a4) (DMat mask' b1 b2 b3 b4) =
+    DMat mask (edmult op a1 b1) (edmult op a2 b2)
+              (edmult op a3 b3) (edmult op a4 b4)
 
 (.*) = dmult
 
-dmult :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Product a) =>
+dmult :: (Cereal.Serialize a, Num a, S.Eq0 a, Storable a, Container Matrix a, Product a) =>
       DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
 dmult (Concrete cmat1) (Concrete cmat2) =
     return $ Concrete $ smult cmat1 cmat2
-dmult (Remote pid) mat = do
-    rmat <- requestMatrix
+dmult (Remote pid quad) mat = do
+    rmat <- requestMatrix pid quad
     dmult rmat mat
-dmult mat (Remote pid) = do
-    rmat <- requestMatrix
+dmult mat (Remote pid quad) = do
+    rmat <- requestMatrix pid quad
     dmult mat rmat
 dmult (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
     let mask = m1 .&. m2
