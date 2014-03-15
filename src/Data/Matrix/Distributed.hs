@@ -20,7 +20,8 @@ import qualified Data.Serialize as Cereal
 import qualified Control.Monad.State as S
 import Control.Monad.Trans (lift)
 import Control.Concurrent
-
+import qualified Pipes
+import Pipes.Prelude as P
 {-
 --                 width height mat
 -- each node stores a row of the matrix
@@ -127,36 +128,105 @@ fromSparse = undefined
 
 requestMatrix :: MElement a => Int -> DT.PID -> Distribute (DMatMessage a) (DMat a)
 requestMatrix quad pid = do
-    let reqpid = 10
-    DT.sendTo pid (Request reqpid quad)
+    DT.sendTo pid (Request quad)
     response <- DT.readFrom pid
     case response of
       Response res -> return res
       _            -> error "communication error"
 
 
-sync :: MElement a => Distribute (DMatMessage a) ()
+{- sync :: MElement a => Distribute (DMatMessage a) ()
 sync = do
     (_, reg) <- S.get
     DT.broadcast Sync
     procs <- S.lift $ DT.processes reg
     count <- lift $ newMVar 0
     CM.forM_ procs $ \p -> lift $ forkIO $ do
-      let loop Finish = undefined
-          loop Sync = undefined
-          loop (Request _ _) = undefined
-        in undefined
+      let loop = do
+            msg <- DT.readP p
+            case msg of
+              Request _ _ -> loop
+              Sync -> DT.writeP p Finish >> loop
+              Finish -> return ()
+        in loop
     lift $ spin (undefined) count
   where spin f mvar = do
           r <- takeMVar mvar
           if f r
             then return ()
-            else spin f mvar
+            else spin f mvar -}
+
+-- sync :: MElement a => [(PID, Int)] -> Distribute (DMatMessage a) [DMat a]
+-- send Sync to every process
+-- request :: [(PID, Int)] -> IO [MVar]
+-- request/respond
+-- finish :: [MVar] -> [DMat a]
+--
+
+request :: PID -> Int -> Distribute (DMatMessage a) (DMat a)
+request = do
+
+{- sync :: MElement a => [(PID, Int)] -> Distribute (DMatMessage a) [DMat a]
+sync pairs = do
+  mvars <- request pairs
+  -- fork off responder
+  forkIO $
+
+  finish mvars -}
+
+sync :: MElement a => Distribute (DMatMessage a) b -> Distribute (DMatMessage a) b
+sync action = do
+    respondToAll
+    result <- action
+    DT.broadcast Finish
+    responses <- DT.receiveAll
+    if all (== Finish) responses
+      then return result
+      else error "something wrong in sync"
+  where respondToAll = do
+          (_, reg) <- S.get
+          procs <- S.lift $ DT.processes reg
+          CM.forM_ procs $ \p -> lift $ forkIO $ do
+            let loop = do
+            msg <- DT.readP p
+            case msg of
+              Request _ _ -> loop
+              Sync -> DT.writeP p Finish >> loop
+              Finish -> return ()
+          take (length proc)
+{-
+data Semaphore = Semaphore (MVar ()) (MVar Int) Int
+
+up :: Int -> Semaphore -> IO ()
+up delta (Semaphore mvar mcount total) = do
+    count <- takeMVar mcount
+    if count + delta >= total
+      then do
+
+        putMVar mvar ()
+
+      else putMVar mcount (count + delta)
+
+up :: Int -> Semaphore -> IO ()
+up count' (Semaphore mvar count total)
+  | count + count' <= total =
+  | otherwise = -}
+
+{- down :: Int -> Semaphore -> IO ()
+down count' (Semaphore mvar mcount total) = do
+  count >= total = putMVar mvar ()
+  | otherwise
+
+down :: Int -> Semaphore -> IO ()
+down delta (Semaphore mvar mcount total) = do
+    count <- takeMVar mcount -}
 
 
 dadd :: MElement a => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
 dadd (Concrete cmat1) (Concrete cmat2) =
     return $ Concrete $ sadd cmat1 cmat2
+dadd (Remote pid quad) (Remote pid' quad') =
+    Remote pid quad
 dadd (Remote pid quad) mat = do
     rmat <- requestMatrix pid quad
     dadd rmat mat

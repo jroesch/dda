@@ -94,7 +94,7 @@ data Q = A | B | C | D deriving (Eq, Show, Generic)
 
 instance Cereal.Serialize Q
 
-data DMatMessage a = Request PID Int
+data DMatMessage a = Request Int
                    | Response (DMat a)
                    | Sync
                    | Finish
