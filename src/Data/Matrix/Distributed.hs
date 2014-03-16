@@ -5,9 +5,9 @@ import Control.Applicative
 import Data.Matrix.Types
 import Data.Word
 import Data.Bits
-import Data.Vector as V
-import Data.Vector.Mutable as M
-import Data.Vector.Hybrid as H
+import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as M
+import qualified Data.Vector.Hybrid as H
 import qualified Sparse.Matrix as S
 import qualified Data.Packed as D
 import Foreign.Storable
@@ -20,8 +20,9 @@ import qualified Data.Serialize as Cereal
 import qualified Control.Monad.State as S
 import Control.Monad.Trans (lift)
 import Control.Concurrent
-import qualified Pipes
-import Pipes.Prelude as P
+
+import qualified Control.Concurrent.MSemN as Sem
+
 {-
 --                 width height mat
 -- each node stores a row of the matrix
@@ -89,14 +90,14 @@ sdAdd op a b = (height><width) $ V.toList resV
     height = rows b
     dense = V.create $ do
       v <- M.new (height * width)
-      CM.forM_ [0..height] $ \y -> CM.forM_ [0..width] $ \x -> write v (x + y*width) (b @@> (x,y))
+      CM.forM_ [0..height] $ \y -> CM.forM_ [0..width] $ \x -> M.write v (x + y*width) (b @@> (x,y))
       return v
     resV = V.modify mutableAdd dense
     mutableAdd mv = (\action -> H.foldM action () sparse) $ \_ (S.Key r c, val) -> do
       let rr = fromIntegral r
       let cc = fromIntegral c
       vals <- M.read mv (cc + rr * width)
-      write mv (cc + rr * width) (val `op` vals)
+      M.write mv (cc + rr * width) (val `op` vals)
       return ()
 
 sadd :: MElement a => CMat a -> CMat a -> CMat a
@@ -163,8 +164,8 @@ sync = do
 -- finish :: [MVar] -> [DMat a]
 --
 
-request :: PID -> Int -> Distribute (DMatMessage a) (DMat a)
-request = do
+-- request :: PID -> Int -> Distribute (DMatMessage a) (DMat a)
+-- request = undefined
 
 {- sync :: MElement a => [(PID, Int)] -> Distribute (DMatMessage a) [DMat a]
 sync pairs = do
@@ -176,24 +177,24 @@ sync pairs = do
 
 sync :: MElement a => Distribute (DMatMessage a) b -> Distribute (DMatMessage a) b
 sync action = do
-    respondToAll
+    (_, reg) <- S.get
+    procs <- lift $ DT.processes reg
+    let numOfProcs = length procs
+    semaphore <- lift $ Sem.new (length procs)
+    lift $ respondToAll procs semaphore
     result <- action
     DT.broadcast Finish
-    responses <- DT.receiveAll
-    if all (== Finish) responses
-      then return result
-      else error "something wrong in sync"
-  where respondToAll = do
-          (_, reg) <- S.get
-          procs <- S.lift $ DT.processes reg
-          CM.forM_ procs $ \p -> lift $ forkIO $ do
-            let loop = do
-            msg <- DT.readP p
-            case msg of
-              Request _ _ -> loop
-              Sync -> DT.writeP p Finish >> loop
-              Finish -> return ()
-          take (length proc)
+    lift $ Sem.wait semaphore numOfProcs
+    return result
+  where respondToAll procs sem =
+          CM.forM_ procs $ \p -> 
+            forkIO $ Sem.with sem 1 (respondLoop p)
+        respondLoop process = do
+          msg <- DT.readP process
+          case msg of
+            Request _ -> respondLoop process
+            Sync -> DT.writeP process Finish >> respondLoop process
+            Finish -> return ()       
 {-
 data Semaphore = Semaphore (MVar ()) (MVar Int) Int
 
@@ -226,7 +227,7 @@ dadd :: MElement a => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
 dadd (Concrete cmat1) (Concrete cmat2) =
     return $ Concrete $ sadd cmat1 cmat2
 dadd (Remote pid quad) (Remote pid' quad') =
-    Remote pid quad
+    return $ Remote pid quad
 dadd (Remote pid quad) mat = do
     rmat <- requestMatrix pid quad
     dadd rmat mat
