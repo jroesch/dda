@@ -12,10 +12,12 @@ import qualified Sparse.Matrix as S
 import qualified Control.Monad.State as ST
 import qualified Distribute as DT
 import Control.Lens
+import qualified Sparse.Matrix
+import Data.Packed
 
 main = defaultMain $ testGroup "Tests" [qcProps]
 
-unitTests = testGroup "HUnit" [test_local_mult]
+unitTests = testGroup "HUnit" [] -- [test_local_mult]
 
 qcProps = testGroup "QuickCheck" [
     property_sparse_dense_add,
@@ -28,24 +30,25 @@ property_sparse_dense_mult = QC.testProperty "sparse * dense" (undefined :: Stri
 
 property_sparse_mult = QC.testProperty "sparse * sparse" (undefined :: String -> Bool)
 
-test_local_mult = HU.testCase "multiplication of two identitty matrices should yield and identity matrix" test
+{- test_local_mult = HU.testCase "multiplication of two identitty matrices should yield and identity matrix" test
   where
-    test = do
+    test = DT.emptyRegistry >>= (\r -> ST.evalStateT (1, r)) $ do
       let mat = DMat 3 (Concrete (Dense (ident 8))) (Concrete Zero) (Concrete Zero) (Concrete (Sparse (S.ident 8)))
       let mat' = DMat 3 mat (Concrete Zero) (Concrete Zero) mat
-      let result = dmult mat' mat'
-      assertEqual "expecting identity" mat' result
+      result <- dmult mat' mat'
+      assertEqual "expecting identity" mat' result -}
 
 test_sync = HU.testCase "sync should allow for messages to be received by all processes" test
-  where test = DT.emptyRegistry (\r -> ST.evalStateT (1, r)) $ do
-          DT.start 3000 DT.registerIncoming
-          st <- ST.get
-          sync $ do
-            mat <- requestMatrix 2 2
-            return mat
-          DT.localState (set _1 2 st) $ sync $ do
-            mat <- requestMatrix 1 1
-            return mat
+  where test = do
+          reg <- DT.emptyRegistry :: IO (DT.Registry (DMatMessage Double))
+          -- Need some kind of data here
+          (flip ST.execStateT) (1, reg) $ do
+            st <- ST.get
+            DT.start 3000 (DT.registerIncoming st)
+            sync undefined (requestMatrix 2 undefined undefined)
+            DT.localState (set _1 2 st) $ do
+              -- PID Dir (L | R) followed by list of Q (A | B | C | D)
+              sync undefined (requestMatrix 1 undefined undefined)
           return ()
             
 
