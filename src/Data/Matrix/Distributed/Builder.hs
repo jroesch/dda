@@ -31,7 +31,7 @@ constructMat'' s id n off = mat
     right x xs = if x `mod` s' >= s'-1 then xs else (S.Key (x+1) x, -1):xs
 
 constructMat' s id n off = case n of 
-                            4 | id >= off && id < off + n' -> constructMat'' s (id-(fromIntegral off)) n (fromIntegral off)
+                            4 | id >= off && id < off + n -> constructMat'' s (id-(fromIntegral off)) n (fromIntegral off)
                             4 -> DMat 15 (Remote ((fromIntegral off) + (fromIntegral id)) [A])
                                          (Remote ((fromIntegral off) + (fromIntegral id) + 1) [B])
                                          (Remote ((fromIntegral off) + (fromIntegral id) + 2) [C])
