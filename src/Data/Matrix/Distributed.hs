@@ -167,10 +167,10 @@ dadd (Concrete cmat1) (Concrete cmat2) =
     return $ Concrete $ sadd cmat1 cmat2
 dadd (Remote pid quad) (Remote pid' quad') =
     return $ Remote pid quad
-dadd (Remote pid quad) mat = sync undefined $ do
+dadd l @ (Remote pid quad) mat = sync (l, mat) $ do
     rmat <- requestMatrix pid R quad
     dadd rmat mat
-dadd mat (Remote pid quad) = sync undefined $ do
+dadd mat r @ (Remote pid quad) = sync (mat, r) $ do
     rmat <- requestMatrix pid L quad
     dadd mat rmat
 dadd (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
@@ -230,10 +230,10 @@ edmult op (DMat mask a1 a2 a3 a4) (DMat mask' b1 b2 b3 b4) =
 dmult :: (MElement a) => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
 dmult (Concrete cmat1) (Concrete cmat2) =
     return $ Concrete $ smult cmat1 cmat2
-dmult (Remote pid quad) mat = sync undefined $ do
+dmult l @ (Remote pid quad) mat = sync (l, mat) $ do
     rmat <- requestMatrix pid L quad
     dmult rmat mat
-dmult mat (Remote pid quad) = sync undefined $ do
+dmult mat r @ (Remote pid quad) = sync (mat, r) $ do
     rmat <- requestMatrix pid R quad
     dmult mat rmat
 dmult (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
