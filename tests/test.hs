@@ -3,8 +3,9 @@ import Test.Tasty.HUnit as HU
 import Test.Tasty.QuickCheck as QC
 import Test.HUnit as H
 
-import Data.Matrix.Types
+import Data.Matrix.Distributed.Types
 import Data.Matrix.Distributed
+import Data.Matrix.Distributed.Sync
 import qualified Data.Packed as D
 import Numeric.Container
 import qualified Sparse.Matrix as S
@@ -36,13 +37,15 @@ test_local_mult = HU.testCase "multiplication of two identitty matrices should y
       assertEqual "expecting identity" mat' result
 
 test_sync = HU.testCase "sync should allow for messages to be received by all processes" test
-  where test = DT.emptyRegistry (\r -> evalStateT (1, r)) $ do
+  where test = DT.emptyRegistry (\r -> ST.evalStateT (1, r)) $ do
           DT.start 3000 DT.registerIncoming
           st <- ST.get
           sync $ do
             mat <- requestMatrix 2 2
+            return mat
           DT.localState (set _1 2 st) $ sync $ do
             mat <- requestMatrix 1 1
+            return mat
           return ()
             
 

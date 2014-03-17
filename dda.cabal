@@ -84,6 +84,8 @@ test-suite test
     tasty-hunit,
     QuickCheck                 >= 2.5 && < 2.6,
     HUnit,
+    lens,
+    mtl,
     hmatrix,
     sparse,
     distribute,

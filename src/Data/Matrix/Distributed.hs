@@ -65,7 +65,7 @@ opOnNonZeros op (DMat mask tl tr bl br) =
 
 {-# RULES
     "opOnNonZeros/opOnNonZeros" forall f g xs. opOnNonZeros f (opOnNonZeros g xs) = opOnNonZeros (f.g) xs
-#-}
+  #-}
 
 transpose :: (S.Arrayed a) => DMat a -> DMat a
 transpose (Concrete (Dense smat)) = Concrete $ Dense $ D.trans smat
@@ -80,7 +80,7 @@ transpose (DMat mask tl tr bl br) =
 
 {-# RULES
     "transpose/transpose" forall a. transpose (transpose a) = a
-#-}
+  #-}
 
 -- sparse-dense elementwise multiply zero * somehting = zero
 -- resulting array is sparse
