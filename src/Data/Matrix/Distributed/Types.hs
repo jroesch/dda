@@ -1,8 +1,10 @@
 {-# LANGUAGE DeriveGeneric, DefaultSignatures, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies, UndecidableInstances, OverlappingInstances, ScopedTypeVariables #-}
-module Data.Matrix.Types
+module Data.Matrix.Distributed.Types
   ( DMat(..)
   , CMat(..)
+  , Arg(..)
+  , Q(..)
   , DMatMessage(..)
   , MElement
   ) where
@@ -22,9 +24,25 @@ import Control.Monad
 import Control.Monad.ST
 import GHC.Generics
 
+-- Would be nice to have clean type alias for this!
+type DMatrix a r = Distribute (DMatMessage a)
+
 -- | Package Matrix element constraints into a convienence class.
-class (Cereal.Serialize a, Num a, S.Eq0 a, Storable a, Container Matrix a, Product a) => MElement a
-instance (Cereal.Serialize a, Num a, S.Eq0 a, Storable a, Container Matrix a, Product a) => MElement a
+class ( Cereal.Serialize a
+      , Num a, S.Eq0 a
+      , Storable a
+      , Container Vector a
+      , Container Matrix a
+      , Product a
+      ) => MElement a
+
+instance ( Cereal.Serialize a
+         , Num a, S.Eq0 a
+         , Storable a
+         , Container Vector a
+         , Container Matrix a
+         , Product a
+         ) =>  MElement a
 
 {- instance Cereal.Serialize a => (Cereal.Serialize (S.Arr a a)) where
   get = undefined
@@ -84,7 +102,7 @@ instance (Cereal.Serialize a, D.Element a)  => (Cereal.Serialize (CMat a))
 
 -- | A distributed matrix
 data DMat a = DMat !Int !(DMat a) !(DMat a) !(DMat a) !(DMat a)
-            | Remote DT.PID Int
+            | Remote DT.PID [Q]
             | Concrete (CMat a)
             deriving (Show, Generic)
 
@@ -94,8 +112,12 @@ data Q = A | B | C | D deriving (Eq, Show, Generic)
 
 instance Cereal.Serialize Q
 
-data DMatMessage a = Request Int
-                   | Response (DMat a)
+data Arg = L | R deriving (Eq, Show, Generic)
+
+instance Cereal.Serialize Arg
+
+data DMatMessage a = Request Arg [Q]
+                   | Response (CMat a)
                    | Sync
                    | Finish
                    deriving (Generic)

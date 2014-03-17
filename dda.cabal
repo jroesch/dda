@@ -18,7 +18,8 @@ cabal-version:       >=1.10
 library
   exposed-modules:
     Data.Matrix.Distributed
-    Data.Matrix.Types
+    Data.Matrix.Distributed.Types
+    Data.Matrix.Distributed.Sync
   -- other-modules:
   -- other-extensions:
   build-depends:
@@ -43,7 +44,7 @@ library
   default-language:
         Haskell2010
 
-test-suite test
+test-suite cg
   default-language:
     Haskell2010
   type:
@@ -52,6 +53,30 @@ test-suite test
     tests
   main-is:
     conjugateGradient.hs
+  build-depends:
+    base >= 4 && < 5,
+    tasty >= 0.7,
+    tasty-quickcheck,
+    tasty-hunit,
+    QuickCheck                 >= 2.5 && < 2.6,
+    HUnit,
+    hmatrix,
+    sparse,
+    distribute,
+    tasty,
+    tasty-quickcheck,
+    tasty-hunit,
+    dda
+
+test-suite test
+  default-language:
+    Haskell2010
+  type:
+    exitcode-stdio-1.0
+  hs-source-dirs:
+    tests
+  main-is:
+    test.hs
   build-depends:
     base >= 4 && < 5,
     tasty >= 0.7,
