@@ -20,6 +20,7 @@ library
     Data.Matrix.Distributed
     Data.Matrix.Distributed.Types
     Data.Matrix.Distributed.Sync
+    Data.Matrix.Distributed.Builder
   -- other-modules:
   -- other-extensions:
   build-depends:

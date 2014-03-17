@@ -17,7 +17,7 @@ import Data.Packed
 
 main = defaultMain $ testGroup "Tests" [qcProps]
 
-unitTests = testGroup "HUnit" [] -- [test_local_mult]
+unitTests = testGroup "HUnit" [test_sync] -- [test_local_mult]
 
 qcProps = testGroup "QuickCheck" [
     property_sparse_dense_add,
