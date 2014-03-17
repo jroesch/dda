@@ -53,10 +53,10 @@ constructMat' s = go 0 []
 constructVec s id n = mat
   where
     mat = case id of
-            0 -> DMat 1 (Concrete $ Sparse $ S.fromList $ go 0 (s `div` 2) []) (Remote 2 [B]) (Remote 3 [C]) (Remote 1 [D])
-            1 -> DMat 2 (Remote 0 [A]) (Remote 2 [B]) (Remote 3 [C]) (Concrete $ Sparse $ S.fromList $ go 0 (s `div` 2) [])
-            2 -> DMat 4 (Remote 0 [A]) (Concrete Zero) (Remote 3 [C]) (Remote 1 [D])
-            3 -> DMat 8 (Remote 0 [A]) (Remote 2 [B]) (Concrete Zero) (Remote 1 [D])
+            0 -> DMat 1 (Concrete $ Sparse $ S.fromList $ go 0 (s `div` 2) []) (Remote 1 [B]) (Remote 2 [C]) (Remote 3 [D])
+            1 -> DMat 2 (Remote 0 [A]) (Concrete Zero) (Remote 2 [C]) (Remote 3 [D]) 
+            2 -> DMat 4 (Remote 0 [A]) (Remote 1 [B]) (Concrete Zero) (Remote 3 [D])
+            3 -> DMat 8 (Remote 0 [A]) (Remote 1 [B]) (Remote 2 [C]) (Concrete $ Sparse $ S.fromList $ go 0 (s `div` 2) [])
     go x e xs | x >= e = xs
     go x e xs = go (x+1) e ((S.Key 0 x, 1):xs)
 
