@@ -2,7 +2,8 @@
 module Data.Matrix.Distributed where
 
 import Control.Applicative
-import Data.Matrix.Types
+import Data.Matrix.Distributed.Types
+import Data.Matrix.Distributed.Sync
 import Data.Word
 import Data.Bits
 import qualified Data.Vector as V
@@ -21,10 +22,8 @@ import qualified Control.Monad.State as S
 import Control.Monad.Trans (lift)
 import Control.Concurrent
 
-import qualified Control.Concurrent.MSemN as Sem
-
 {-
---                 width height mat
+-- width height mat
 -- each node stores a row of the matrix
 data SMat a = SMat !Word !Word (Vector Matrix)
 
@@ -127,74 +126,6 @@ smult (Dense left) (Sparse right) =
 fromSparse :: [a] -> DMat a
 fromSparse = undefined
 
-requestMatrix :: MElement a => Int -> DT.PID -> Distribute (DMatMessage a) (DMat a)
-requestMatrix quad pid = do
-    DT.sendTo pid (Request quad)
-    response <- DT.readFrom pid
-    case response of
-      Response res -> return res
-      _            -> error "communication error"
-
-
-{- sync :: MElement a => Distribute (DMatMessage a) ()
-sync = do
-    (_, reg) <- S.get
-    DT.broadcast Sync
-    procs <- S.lift $ DT.processes reg
-    count <- lift $ newMVar 0
-    CM.forM_ procs $ \p -> lift $ forkIO $ do
-      let loop = do
-            msg <- DT.readP p
-            case msg of
-              Request _ _ -> loop
-              Sync -> DT.writeP p Finish >> loop
-              Finish -> return ()
-        in loop
-    lift $ spin (undefined) count
-  where spin f mvar = do
-          r <- takeMVar mvar
-          if f r
-            then return ()
-            else spin f mvar -}
-
--- sync :: MElement a => [(PID, Int)] -> Distribute (DMatMessage a) [DMat a]
--- send Sync to every process
--- request :: [(PID, Int)] -> IO [MVar]
--- request/respond
--- finish :: [MVar] -> [DMat a]
---
-
--- request :: PID -> Int -> Distribute (DMatMessage a) (DMat a)
--- request = undefined
-
-{- sync :: MElement a => [(PID, Int)] -> Distribute (DMatMessage a) [DMat a]
-sync pairs = do
-  mvars <- request pairs
-  -- fork off responder
-  forkIO $
-
-  finish mvars -}
-
-sync :: MElement a => Distribute (DMatMessage a) b -> Distribute (DMatMessage a) b
-sync action = do
-    (_, reg) <- S.get
-    procs <- lift $ DT.processes reg
-    let numOfProcs = length procs
-    semaphore <- lift $ Sem.new (length procs)
-    lift $ respondToAll procs semaphore
-    result <- action
-    DT.broadcast Finish
-    lift $ Sem.wait semaphore numOfProcs
-    return result
-  where respondToAll procs sem =
-          CM.forM_ procs $ \p -> 
-            forkIO $ Sem.with sem 1 (respondLoop p)
-        respondLoop process = do
-          msg <- DT.readP process
-          case msg of
-            Request _ -> respondLoop process
-            Sync -> DT.writeP process Finish >> respondLoop process
-            Finish -> return ()       
 {-
 data Semaphore = Semaphore (MVar ()) (MVar Int) Int
 
@@ -228,11 +159,11 @@ dadd (Concrete cmat1) (Concrete cmat2) =
     return $ Concrete $ sadd cmat1 cmat2
 dadd (Remote pid quad) (Remote pid' quad') =
     return $ Remote pid quad
-dadd (Remote pid quad) mat = do
-    rmat <- requestMatrix pid quad
+dadd (Remote pid quad) mat = sync undefined $ do
+    rmat <- requestMatrix pid R quad
     dadd rmat mat
-dadd mat (Remote pid quad) = do
-    rmat <- requestMatrix pid quad
+dadd mat (Remote pid quad) = sync undefined $ do
+    rmat <- requestMatrix pid L quad
     dadd mat rmat
 dadd (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
   let mask = m1 .&. m2
@@ -268,7 +199,7 @@ edadd op (DMat mask a1 a2 a3 a4) (DMat mask' b1 b2 b3 b4) =
 (^-) =  edadd (-)
 
 -- elementwise multiply on semiring, multiplication by zero = zero
-emult :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Storable (a, a)) => (a -> a -> a) -> CMat a -> CMat a -> CMat a
+emult :: (MElement a, Storable (a, a)) => (a -> a -> a) -> CMat a -> CMat a -> CMat a
 emult op a b = case (a, b) of
                  (Sparse sa, Sparse sb) -> Sparse $ S.elementMultiplyWith op sa sb
                  (Dense da,  Dense db)  -> Dense $ D.liftMatrix2 (\v1 v2 -> mapVector (\(a1, a2) -> op a1 a2) (zipVector v1 v2)) da db
@@ -279,7 +210,7 @@ emult op a b = case (a, b) of
 
 (^*) = emult (*)
 
-edmult :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Storable (a, a)) => (a -> a -> a) -> DMat a -> DMat a -> DMat a
+edmult :: (MElement a, Storable (a, a)) => (a -> a -> a) -> DMat a -> DMat a -> DMat a
 edmult op (Concrete a) (Concrete b) = Concrete $ emult op a b
 edmult op (Remote pid1 a) (Remote pid2 b) = Remote pid1 a
 edmult op (DMat mask a1 a2 a3 a4) (DMat mask' b1 b2 b3 b4) =
@@ -288,15 +219,14 @@ edmult op (DMat mask a1 a2 a3 a4) (DMat mask' b1 b2 b3 b4) =
 
 (.*) = dmult
 
-dmult :: (Cereal.Serialize a, Num a, S.Eq0 a, Storable a, Container Matrix a, Product a) =>
-      DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
+dmult :: (MElement a) => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
 dmult (Concrete cmat1) (Concrete cmat2) =
     return $ Concrete $ smult cmat1 cmat2
-dmult (Remote pid quad) mat = do
-    rmat <- requestMatrix pid quad
+dmult (Remote pid quad) mat = sync undefined $ do
+    rmat <- requestMatrix pid L quad
     dmult rmat mat
-dmult mat (Remote pid quad) = do
-    rmat <- requestMatrix pid quad
+dmult mat (Remote pid quad) = sync undefined $ do
+    rmat <- requestMatrix pid R quad
     dmult mat rmat
 dmult (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
     let mask = m1 .&. m2
