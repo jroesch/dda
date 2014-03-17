@@ -64,6 +64,10 @@ opOnNonZeros op (DMat mask tl tr bl br) =
     DMat mask (opOnNonZeros op tl) (opOnNonZeros op tr)
               (opOnNonZeros op bl) (opOnNonZeros op br)
 
+{-# RULES
+    "opOnNonZeros/opOnNonZeros" forall f g xs. opOnNonZeros f (opOnNonZeros g xs) = opOnNonZeros (f.g) xs
+#-}
+
 transpose :: (S.Arrayed a) => DMat a -> DMat a
 transpose (Concrete (Dense smat)) = Concrete $ Dense $ D.trans smat
 transpose (Concrete (Sparse smat)) = Concrete $ Sparse $ S.transpose smat
@@ -74,6 +78,10 @@ transpose (DMat mask tl tr bl br) =
                       (transpose tr) (transpose br)
   where
     mask' m = (m .&. 1) + (m .&. 8) + (if thirdQ m then 1 else 0)*2 + (if secondQ m then 1 else 0)*4
+
+{-# RULES
+    "transpose/transpose" forall a. transpose (transpose a) = a
+#-}
 
 -- sparse-dense elementwise multiply zero * somehting = zero
 -- resulting array is sparse
@@ -277,7 +285,7 @@ emult op a b = case (a, b) of
                  (Zero,      other)     -> other
                  (other,     Zero)      -> other
 
-(^*) = emult (*)
+(^*) = edmult (*)
 
 edmult :: (Num a, S.Eq0 a, Storable a, Container Matrix a, Storable (a, a)) => (a -> a -> a) -> DMat a -> DMat a -> DMat a
 edmult op (Concrete a) (Concrete b) = Concrete $ emult op a b
