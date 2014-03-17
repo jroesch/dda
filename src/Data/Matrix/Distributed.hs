@@ -169,10 +169,10 @@ dadd (Remote pid quad) (Remote pid' quad') =
     return $ Remote pid quad
 dadd l @ (Remote pid quad) mat = sync (l, mat) $ do
     rmat <- requestMatrix pid R quad
-    dadd rmat mat
+    lift $ dadd rmat mat
 dadd mat r @ (Remote pid quad) = sync (mat, r) $ do
     rmat <- requestMatrix pid L quad
-    dadd mat rmat
+    lift $ dadd mat rmat
 dadd (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
   let mask = m1 .&. m2
   tl <- ternary (firstQ mask) (return l1) (dadd l1 r1)
@@ -232,10 +232,10 @@ dmult (Concrete cmat1) (Concrete cmat2) =
     return $ Concrete $ smult cmat1 cmat2
 dmult l @ (Remote pid quad) mat = sync (l, mat) $ do
     rmat <- requestMatrix pid L quad
-    dmult rmat mat
+    lift $ dmult rmat mat
 dmult mat r @ (Remote pid quad) = sync (mat, r) $ do
     rmat <- requestMatrix pid R quad
-    dmult mat rmat
+    lift $ dmult mat rmat
 dmult (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
     let mask = m1 .&. m2
     topLeft <- ternary (firstQ mask) (return l1) $

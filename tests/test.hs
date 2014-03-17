@@ -14,8 +14,12 @@ import qualified Distribute as DT
 import Control.Lens
 import qualified Sparse.Matrix
 import Data.Packed
+import Control.Monad.Trans (lift)
+import Control.Concurrent
 
-main = defaultMain $ testGroup "Tests" [qcProps]
+import Data.Matrix.Distributed.Builder
+
+main = defaultMain $ testGroup "Tests" [unitTests] -- [qcProps]
 
 unitTests = testGroup "HUnit" [test_sync] -- [test_local_mult]
 
@@ -40,16 +44,29 @@ property_sparse_mult = QC.testProperty "sparse * sparse" (undefined :: String ->
 
 test_sync = HU.testCase "sync should allow for messages to be received by all processes" test
   where test = do
-          reg <- DT.emptyRegistry :: IO (DT.Registry (DMatMessage Double))
+          reg1 <- DT.emptyRegistry :: IO (DT.Registry (DMatMessage Double))
+          reg2 <- DT.emptyRegistry :: IO (DT.Registry (DMatMessage Double))
+          let mat = constructMat 10 0 4
+          let mat2 = constructMat 10 1 4
+          print mat
+          print mat2
           -- Need some kind of data here
-          (flip ST.execStateT) (1, reg) $ do
+          forkIO $ (flip ST.evalStateT) (0, reg1) $ do
             st <- ST.get
             DT.start 3000 (DT.registerIncoming st)
-            sync undefined (requestMatrix 2 undefined undefined)
-            DT.localState (set _1 2 st) $ do
-              -- PID Dir (L | R) followed by list of Q (A | B | C | D)
-              sync undefined (requestMatrix 1 undefined undefined)
+            ST.lift $ putStrLn "above sync"
+            lift $ threadDelay 1000
+            sync (mat, mat) (requestMatrix 1 L [B])
+            ST.lift $ putStrLn "Done1"
+            return ()
+
+          (flip ST.evalStateT) (1, reg2)  $ do
+            st' <- ST.get
+            DT.start 4000 (DT.registerIncoming st')
+            DT.open "localhost" 3000
+            ST.lift $ putStrLn "above sync"
+            sync (mat2, mat2) (requestMatrix 0 L [A])
+            ST.lift $ putStrLn "DOne2"
+            return ()
+
           return ()
-            
-
-
