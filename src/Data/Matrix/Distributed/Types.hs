@@ -34,6 +34,7 @@ class ( Cereal.Serialize a
       , Container Vector a
       , Container Matrix a
       , Product a
+      , Show a
       ) => MElement a
 
 instance ( Cereal.Serialize a
@@ -42,6 +43,7 @@ instance ( Cereal.Serialize a
          , Container Vector a
          , Container Matrix a
          , Product a
+         , Show a
          ) =>  MElement a
 
 {- instance Cereal.Serialize a => (Cereal.Serialize (S.Arr a a)) where
@@ -120,6 +122,6 @@ data DMatMessage a = Request Arg [Q]
                    | Response (CMat a)
                    | Sync
                    | Finish
-                   deriving (Generic)
+                   deriving (Show, Generic)
 
 instance (Cereal.Serialize a, D.Element a) => (Cereal.Serialize (DMatMessage a))
