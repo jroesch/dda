@@ -14,8 +14,8 @@ main = defaultMain $ testGroup "Tests" [qcProps]
 unitTests = testGroup "HUnit" [test_local_mult]
 
 qcProps = testGroup "QuickCheck" [
-    property_sparse_dense_add, 
-    property_sparse_dense_mult, 
+    property_sparse_dense_add,
+    property_sparse_dense_mult,
     property_sparse_mult]
 
 property_sparse_dense_add = QC.testProperty "sparse + dense" (undefined :: String -> Bool)
