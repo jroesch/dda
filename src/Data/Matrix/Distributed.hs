@@ -92,7 +92,10 @@ transpose :: (S.Arrayed a) => DMat a -> DMat a
 transpose (Concrete (Dense smat)) = Concrete $ Dense $ D.trans smat
 transpose (Concrete (Sparse smat)) = Concrete $ Sparse $ S.transpose smat
 transpose (Concrete Zero) = Concrete Zero
-transpose (Remote pid quad) = Remote pid quad
+transpose (Remote pid quad) = case quad of
+                                [B] -> Remote pid [C]
+                                [C] -> Remote pid [B]
+                                a -> Remote pid a
 transpose (DMat mask tl tr bl br) =
     DMat (mask' mask) (transpose tl) (transpose bl)
                       (transpose tr) (transpose br)

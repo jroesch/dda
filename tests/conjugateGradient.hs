@@ -14,6 +14,7 @@ conjugateGradient :: DMat Double -> DMat Double -> DMat Double -> Distribute (DM
 conjugateGradient mat x b = do
     lift $ print 1
     tmp <- mat .* b
+    lift $ print $ "$$$ " ++ show tmp
     lift $ print "----------------------"
     rtr <- ddot b b
     lift $ print 2
