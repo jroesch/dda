@@ -182,23 +182,25 @@ down delta (Semaphore mvar mcount total) = do
 
 
 dadd :: MElement a => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
-dadd (Concrete cmat1) (Concrete cmat2) =
-    return $ Concrete $ sadd cmat1 cmat2
-dadd (Remote pid quad) (Remote pid' quad') =
-    return $ Remote pid quad
-dadd l @ (Remote pid quad) mat = sync (l, mat) $ do
-    rmat <- requestMatrix pid R quad
-    lift $ dadd rmat mat
-dadd mat r @ (Remote pid quad) = sync (mat, r) $ do
-    rmat <- requestMatrix pid L quad
-    lift $ dadd mat rmat
-dadd (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
-  let mask = m1 .&. m2
-  tl <- ternary (firstQ mask) (return l1) (dadd l1 r1)
-  tr <- ternary (secondQ mask) (return l2) (dadd l2 r2)
-  bl <- ternary (thirdQ mask) (return l3) (dadd l3 r3)
-  br <- ternary (fourthQ mask) (return l4) (dadd l4 r4)
-  return $ DMat mask tl tr bl br
+dadd r l = sync (l, r) $ (dadd' l r)
+    where 
+      dadd' (Concrete cmat1) (Concrete cmat2) =
+        return $ Concrete $ sadd cmat1 cmat2
+      dadd' (Remote pid quad) (Remote pid' quad') =
+        return $ Remote pid quad
+      dadd' l @ (Remote pid quad) mat = do
+        rmat <- requestMatrix pid R quad
+        lift $ dadd rmat mat
+      dadd' mat r @ (Remote pid quad) = do
+        rmat <- requestMatrix pid L quad
+        lift $ dadd mat rmat
+      dadd' (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
+          let mask = m1 .&. m2
+          tl <- ternary (firstQ mask) (return l1) (dadd' l1 r1)
+          tr <- ternary (secondQ mask) (return l2) (dadd' l2 r2)
+          bl <- ternary (thirdQ mask) (return l3) (dadd' l3 r3)
+          br <- ternary (fourthQ mask) (return l4) (dadd' l4 r4)
+          return $ DMat mask tl tr bl br
 
 -- elementwise operations
 
