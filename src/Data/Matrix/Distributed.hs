@@ -22,36 +22,16 @@ import qualified Control.Monad.State as S
 import Control.Monad.Trans (lift)
 import Control.Concurrent
 
-{-
--- width height mat
--- each node stores a row of the matrix
-data SMat a = SMat !Word !Word (Vector Matrix)
-
-toXY :: !Word -> !Word -> !(Word, Word)
-toXY i s = (i `div` s, i `mod` s)
-
-toI :: !(Word, Word) -> !Word -> !Word
-toI (x, y) s = y * s + x
-
-matMul :: SMat a -> Smat a -> IO (SMat a)
-matMul m1@(SMat width1 height1 vm1) m2@(SMat width2 height2 vm2) = do
-    vm <- V.generateM numNodes (\i -> go 0 i Nothing)
-    return $ SMat width1 height1 vm
-  where
-    -- TODO: make this a fold
-    go i x m = case i < numNodes of
-              True  -> do
-                let lm = vm1 ! i
-                rm <- if i == id then vm2 ! i else get (x, i)
-                case m of
-                  Just mm -> go (i + 1) (mm + (lm * rm))
-                  Nothing -> go (i + 1) (lm * rm)
-              False -> m
-
-matAdd :: SMat a -> Smat a -> IO (SMat a)
-matAdd m1@(SMat width1 height1 vm1) m2@(SMat width2 height2 vm2) =
-    return $ SMat width1 height1 $ V.zipWith (+) vm1 vm2
--}
+topleft :: (MElement a) => DMat a -> a
+topleft mat = case mat of
+                Concrete (Dense smat) -> smat @@> (0,0)
+                Concrete (Sparse smat) -> let list = filter (\(S.Key a b, _) -> a == 0 && b == 0$ (from S._Mat) # smat
+                                              in case list of
+                                                   [] -> 0
+                                                   [(S.Key _ _, v)] -> v --TODO send to all here
+                Concrete Zero -> 0
+                Remote pid _ -> recieve -- TODO: recive from owner here
+                DMat _ smat _ _ _ -> topleft smat
 
 opOnNonZeros :: (Storable a, S.Arrayed a) => (a -> a) -> DMat a -> DMat a
 opOnNonZeros op (Concrete (Dense smat)) = Concrete $ Dense $ D.mapMatrix op smat
@@ -66,6 +46,14 @@ opOnNonZeros op (DMat mask tl tr bl br) =
 {-# RULES
     "opOnNonZeros/opOnNonZeros" forall f g xs. opOnNonZeros f (opOnNonZeros g xs) = opOnNonZeros (f.g) xs
   #-}
+
+infixl 7 *#
+(*#) :: MElement a => a -> DMat a -> DMat a
+a *# b = opOnNonZeros (a *) b
+
+infixl 7 #*
+(#*) :: MElement a => DMat a -> a -> DMat a
+a #* b = opOnNonZeros (b *) a
 
 transpose :: (S.Arrayed a) => DMat a -> DMat a
 transpose (Concrete (Dense smat)) = Concrete $ Dense $ D.trans smat
@@ -203,7 +191,11 @@ edadd op (DMat mask a1 a2 a3 a4) (DMat mask' b1 b2 b3 b4) =
     DMat mask (edadd op a1 b1) (edadd op a2 b2)
               (edadd op a3 b3) (edadd op a4 b4)
 
+infixl 6 ^+
+(^+) :: (MElement a,  Storable (a, a)) => DMat a -> DMat a -> DMat a
 (^+) =  edadd (+)
+infixl 6 ^-
+(^-) :: (MElement a,  Storable (a, a)) => DMat a -> DMat a -> DMat a
 (^-) =  edadd (-)
 
 -- elementwise multiply on semiring, multiplication by zero = zero
@@ -216,6 +208,7 @@ emult op a b = case (a, b) of
                  (Zero,      other)     -> other
                  (other,     Zero)      -> other
 
+(^*) :: (MElement a, Storable (a, a)) => DMat a -> DMat a -> DMat a
 (^*) = edmult (*)
 
 edmult :: (MElement a, Storable (a, a)) => (a -> a -> a) -> DMat a -> DMat a -> DMat a
@@ -224,7 +217,7 @@ edmult op (Remote pid1 a) (Remote pid2 b) = Remote pid1 a
 edmult op (DMat mask a1 a2 a3 a4) (DMat mask' b1 b2 b3 b4) =
     DMat mask (edmult op a1 b1) (edmult op a2 b2)
               (edmult op a3 b3) (edmult op a4 b4)
-
+infixr 7 .*
 (.*) = dmult
 
 dmult :: (MElement a) => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
