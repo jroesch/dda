@@ -259,13 +259,13 @@ infixr 7 .*
 (.*) = dmult
 
 dmult :: (MElement a) => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
-dmult r l = sync (r, l) (dmult' r l)
+dmult l r = sync (l, r) (dmult' l r)
   where 
     dmult' (Concrete cmat1) (Concrete cmat2) =
         return $ Concrete $ smult cmat1 cmat2
     dmult' l @ (Remote pid quad) mat = do
-        rmat <- requestMatrix pid L quad
-        dmult' rmat mat
+        lmat <- requestMatrix pid L quad
+        dmult' lmat mat
     dmult' mat r @ (Remote pid quad) = do
         rmat <- requestMatrix pid R quad
         dmult' mat rmat
