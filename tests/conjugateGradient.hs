@@ -13,11 +13,13 @@ import Control.Concurrent
 conjugateGradient :: DMat Double -> DMat Double -> DMat Double -> Distribute (DMatMessage Double) (DMat Double)
 conjugateGradient mat x b = do
     lift $ print 1
+    tmp <- mat .* b
+    lift $ print "----------------------"
     rtr <- ddot b b
     lift $ print 2
     let norm = sqrt rtr
     lift $ print 3
-    lift $ print $ "hihi " ++ show norm
+    lift $ print $ ">>>>>>>>>>>>>>>>>>>>>> " ++ show norm
     lift $ print 4
     cg mat x b b rtr 0 norm
   where
