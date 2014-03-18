@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Data.Matrix.Distributed.Sync
-  ( sync,
+  ( Requests,
+    sync,
     requestMatrix,
     respondMatrix
   ) where

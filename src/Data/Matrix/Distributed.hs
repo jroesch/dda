@@ -30,9 +30,10 @@ compute pid action = do
 topleft :: (MElement a) => DMat a -> Distribute (DMatMessage a) a
 topleft m = sync (m, m) (unsafeTopLeft m)
   where
+    unsafeTopLeft :: (MElement a) => DMat a -> Requests a a
     unsafeTopLeft (Concrete (Dense smat)) = return $ smat @@> (0,0)
     unsafeTopLeft (Concrete (Sparse smat)) = let list = H.filter (\(S.Key a b, _) -> a == 0 && b == 0) $ (from S._Mat) # smat
-                                              in return $ if empty list then 0 else snd $ list H.! 0
+                                              in return $ if H.null list then 0 else snd $ list H.! 0
     unsafeTopLeft (Concrete Zero) = return 0
     unsafeTopLeft r @ (Remote pid quad) = do
         mat <- requestMatrix pid L quad
