@@ -4,6 +4,8 @@ import Data.Matrix.Distributed.Builder
 import Data.Matrix.Distributed
 import Distribute (Distribute)
 import Control.Monad
+import Control.Monad.Trans.State as S
+import Foreign.Storable.Tuple
 
 conjugateGradient :: DMat Double -> DMat Double -> DMat Double -> Distribute (DMatMessage Double) (DMat Double)
 conjugateGradient mat x b = do
@@ -25,15 +27,16 @@ conjugateGradient mat x b = do
                                let relres = (sqrt rtr) / norm
                                cg mat x d r rtr' (iters + 1) norm
     ddot :: DMat Double -> DMat Double -> Distribute (DMatMessage Double) Double
-    ddot x y = liftM topleft $ (transpose x) .* y
+    ddot x y = (transpose x) .* y >>= topleft
 
 main = do
-    let id = 0
-        n  = 4
-        mat = constructMat 1024 id n
-        vec = constructVec 1024 id n
-        zer = zeros 1024 id n
+    (id, _) <- S.get
     compute id procs $ do
+      let n   = 4
+          mat = constructMat 1024 id n
+          vec = constructVec 1024 id n
+          zer = zeros 1024 id n
       conjugateGradient mat zer vec
+      return ()
     return ()
-  where procs = [(0, "localhost", 4000), (1, "localhost", 3000)]
+  where procs = [(0, "localhost", 4000), (1, "localhost", 3000), (2, "localhost", 3001), (3, "localhost", 3002)]
