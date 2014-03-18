@@ -5,16 +5,17 @@ import Data.Matrix.Distributed
 import Distribute (Distribute)
 import Control.Monad
 
-conjugateGradient :: (Floating a, MElement a) => DMat a -> DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
+conjugateGradient :: DMat Double -> DMat Double -> DMat Double -> Distribute (DMatMessage Double) (DMat Double)
 conjugateGradient mat x b = do
     rtr <- ddot b b
     let norm = sqrt rtr
     cg mat x b b rtr 0 norm
   where
+    cg :: DMat Double -> DMat Double -> DMat Double -> DMat Double -> Double -> Int -> Double -> Distribute (DMatMessage Double) (DMat Double)
     cg mat x d r rtr iters norm = if (sqrt rtr) / norm < 1e-6 || iters < 100
                              then return x
                              else do
-                               ad <- mat .* b
+                               ad :: DMat Double <- mat .* d
                                alpha <- liftM (rtr /) $ ddot d ad
                                let x' = x ^+ alpha *# d
                                    r' = r ^- alpha *# ad
@@ -22,8 +23,8 @@ conjugateGradient mat x b = do
                                let beta = rtr / rtr'
                                    d = r' ^+ beta *# d
                                let relres = (sqrt rtr) / norm
-                               cg mat x d r rtr' (iters + 1)
-
+                               cg mat x d r rtr' (iters + 1) norm
+    ddot :: DMat Double -> DMat Double -> Distribute (DMatMessage Double) Double
     ddot x y = liftM topleft $ (transpose x) .* y
 
 main = do
