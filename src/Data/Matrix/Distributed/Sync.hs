@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, BangPatterns #-}
 module Data.Matrix.Distributed.Sync
   ( Requests,
     sync,
@@ -20,6 +20,7 @@ import Text.Printf
 import Control.Monad.Trans.Reader as R
 import Control.Concurrent.Chan as Chan
 import Data.Serialize (encode)
+import Control.Concurrent
 
 type Requests a b = ReaderT (Chan (CMat a)) (Distribute (DMatMessage a)) b
 
@@ -35,25 +36,36 @@ respondMatrix cmat process = DT.writeP process (Response cmat)
 
 sync :: MElement a => (DMat a, DMat a) -> Requests a b -> Distribute (DMatMessage a) b
 sync args requests = do
-    (_, reg) <- S.get
+    lift $ print "starting sync"
+    (pid, reg) <- S.get
     procs <- lift $ DT.processes reg
     let numOfProcs = length procs
     semaphore <- lift $ Sem.new (length procs)
     chan <- lift $ Chan.newChan
-    lift $ setupResponders chan args procs semaphore
-    result <- runReaderT requests chan
+    lift $ setupResponders pid chan args procs semaphore
+    -- lift $ yield
+    lift $ print 5
+    !result <- runReaderT requests chan -- hanging here
+    lift $ print 6
     DT.broadcast Finish
-    lift $ Sem.wait semaphore numOfProcs
+    lift $ print 7
+    lift $ print $ show pid ++ " broadcasted finish"
+    lift $ Sem.wait semaphore (numOfProcs)
+    lift $ print "done syncing"
     return result
 
-setupResponders :: (Container Vector a, MElement a) => Chan (CMat a) -> (DMat a, DMat a) -> [DT.DProcess (DMatMessage a)] -> Sem.MSemN Int -> IO ()
-setupResponders chan (l, r) procs sem =
+setupResponders :: (Container Vector a, MElement a) => DT.PID -> Chan (CMat a) -> (DMat a, DMat a) -> [DT.DProcess (DMatMessage a)] -> Sem.MSemN Int -> IO ()
+setupResponders pid chan (l, r) procs sem =
     forM_ procs $ \p ->
       forkIO $ Sem.with sem 1 (respondLoop p)
   where respondLoop process = do
           msg <- DT.readP process
+          print $ show pid ++ " got " ++ show msg
           case msg of
-            Finish -> return ()
+            Finish -> do
+              print $ show pid ++ " finished"
+              respondLoop process
+              return ()
             Sync -> DT.writeP process Finish >> respondLoop process
             Response cmat -> do
               Chan.writeChan chan cmat

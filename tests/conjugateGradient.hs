@@ -16,13 +16,18 @@ conjugateGradient mat x b = do
     tmp <- mat .* b
     lift $ print $ "$$$ " ++ show tmp
     lift $ print "----------------------"
-    rtr <- ddot b b
-    lift $ print 2
-    let norm = sqrt rtr
-    lift $ print 3
-    lift $ print $ ">>>>>>>>>>>>>>>>>>>>>> " ++ show norm
-    lift $ print 4
-    cg mat x b b rtr 0 norm
+    lift $ threadDelay 10000
+    return $ mat
+    -- tmp <- mat .* b
+    -- lift $ print "$$$$$$$$$$$$$$$$$$$$$$"
+    -- lift $ threadDelay 10000
+    -- rtr <- ddot b b
+    -- lift $ print 2
+    -- let norm = sqrt rtr
+    -- lift $ print 3
+    -- lift $ print $ ">>>>>>>>>>>>>>>>>>>>>> " ++ show norm
+    -- lift $ print 4
+    -- cg mat x b b rtr 0 norm
   where
     cg :: DMat Double -> DMat Double -> DMat Double -> DMat Double -> Double -> Int -> Double -> Distribute (DMatMessage Double) (DMat Double)
     cg mat x d r rtr iters norm = if iters /= 0 && ((sqrt rtr) / norm < 1e-6 || iters > 100)
@@ -57,7 +62,7 @@ main = do
       lift $ print $ show id ++ " " ++ show mat
       lift $ print $ show id ++ " " ++ show vec
       lift $ print $ show id ++ " " ++ show zer
-      lift $ threadDelay 1000000
+      lift $ threadDelay 3000000
       lift $ print $ show id ++ " done delaying"
       conjugateGradient mat zer vec
       lift $ print "done"
