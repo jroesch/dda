@@ -18,6 +18,7 @@ import qualified Data.Vector
 import Text.Printf
 import Control.Monad.Trans.Reader as R
 import Control.Concurrent.Chan as Chan
+import Data.Serialize (encode)
 
 type Requests a = ReaderT (Chan (CMat a)) (Distribute (DMatMessage a)) (DMat a)
 
@@ -88,4 +89,4 @@ traverseMat (DMat _ a b c d) (i:is) = case i of
     B -> traverseMat b is
     C -> traverseMat c is
     D -> traverseMat d is
-traverseMat _ is = error "trying to index a non-dist matrix"
+traverseMat mat is = error $ printf "traverseMat: trying to index %s with %s" (show mat) (show is)
