@@ -4,7 +4,7 @@ import Data.Matrix.Distributed.Builder
 import Data.Matrix.Distributed
 import Distribute (Distribute)
 import Control.Monad
-import Control.Monad.Trans.State as S
+import Control.Monad.Trans.State.Strict as S
 import Control.Monad.Trans
 import Foreign.Storable.Tuple
 import System.Environment
@@ -17,6 +17,8 @@ conjugateGradient mat x b = do
     lift $ print 2
     let norm = sqrt rtr
     lift $ print 3
+    lift $ print $ "hihi " ++ show norm
+    lift $ print 4
     cg mat x b b rtr 0 norm
   where
     cg :: DMat Double -> DMat Double -> DMat Double -> DMat Double -> Double -> Int -> Double -> Distribute (DMatMessage Double) (DMat Double)
@@ -49,10 +51,14 @@ main = do
           mat = constructMat 4 id n
           vec = constructVec 4 id n
           zer = zeros 4 id n
+      lift $ print $ show id ++ " " ++ show mat
+      lift $ print $ show id ++ " " ++ show vec
+      lift $ print $ show id ++ " " ++ show zer
       lift $ threadDelay 1000000
+      lift $ print $ show id ++ " done delaying"
       conjugateGradient mat zer vec
       lift $ print "done"
       return ()
     threadDelay 100000000
     return ()
-  where procs = [(0, "localhost", 4000), (1, "localhost", 3000), (2, "localhost", 3001), (3, "localhost", 3002)]
+  where procs = [(0, "localhost", 3000), (1, "localhost", 3001), (2, "localhost", 3002), (3, "localhost", 3003)]
