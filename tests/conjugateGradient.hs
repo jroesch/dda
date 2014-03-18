@@ -20,9 +20,12 @@ conjugateGradient mat x b = do
     cg mat x b b rtr 0 norm
   where
     cg :: DMat Double -> DMat Double -> DMat Double -> DMat Double -> Double -> Int -> Double -> Distribute (DMatMessage Double) (DMat Double)
-    cg mat x d r rtr iters norm = if (sqrt rtr) / norm < 1e-6 || iters < 100
-                             then return x
+    cg mat x d r rtr iters norm = if iters /= 0 && ((sqrt rtr) / norm < 1e-6 || iters > 100)
+                             then do
+                               lift $ print "bad"
+                               return x
                              else do
+                               lift $ print 5
                                ad :: DMat Double <- mat .* d
                                alpha <- liftM (rtr /) $ ddot d ad
                                lift $ print 4
@@ -43,11 +46,13 @@ main = do
     compute (read (args !! 0)) procs $ do
       (id, _) <- S.get
       let n   = 4
-          mat = constructMat 1024 id n
-          vec = constructVec 1024 id n
-          zer = zeros 1024 id n
+          mat = constructMat 4 id n
+          vec = constructVec 4 id n
+          zer = zeros 4 id n
+      lift $ threadDelay 1000000
       conjugateGradient mat zer vec
+      lift $ print "done"
       return ()
-    threadDelay 10000000
+    threadDelay 100000000
     return ()
   where procs = [(0, "localhost", 4000), (1, "localhost", 3000), (2, "localhost", 3001), (3, "localhost", 3002)]
