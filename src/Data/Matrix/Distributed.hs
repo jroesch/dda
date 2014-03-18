@@ -22,10 +22,19 @@ import qualified Control.Monad.State as S
 import Control.Monad.Trans (lift)
 import Control.Concurrent
 
-compute :: (MElement a ) => DT.PID -> Distribute (DMatMessage a) () -> IO ()
-compute pid action = do
-    reg <- DT.emptyRegistry
-    DT.runDistribute (pid, reg) action
+compute :: (MElement a) => DT.PID -> [(DT.PID, String, Int)] -> Distribute (DMatMessage a) () -> IO ()
+compute pid procs action = do
+    forM_ procs $ \(ppid, host, port) ->
+      when (host == "localhost") $ do
+        reg <- DT.emptyRegistry
+        let state = (ppid, reg)
+        forkIO $ DT.runDistribute state $ do
+          DT.start port (DT.registerIncoming state)
+          when (ppid < pid) $ do
+            DT.open host port
+            return ()
+          action
+        return ()
 
 topleft :: (MElement a) => DMat a -> Distribute (DMatMessage a) a
 topleft m = sync (m, m) (unsafeTopLeft m)

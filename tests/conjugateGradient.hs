@@ -32,5 +32,7 @@ main = do
         mat = constructMat 1024 id n
         vec = constructVec 1024 id n
         zer = zeros 1024 id n
-    conjugateGradient mat zer vec
+    compute id procs $ do
+      conjugateGradient mat zer vec
     return ()
+  where procs = [(0, "localhost", 4000), (1, "localhost", 3000)]
