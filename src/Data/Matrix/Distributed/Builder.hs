@@ -45,10 +45,10 @@ constructMat' s id n off = case n of
     n' = n `div` 4
 
 constructVec :: MElement a => Int -> Int -> Int -> DMat a
-constructVec s id n = zeros' s id n 0
+constructVec s id n = constructVec' (fromIntegral s) id n 0
 
 constructVec' s id n off = case n of 
-                            4 | id >= off && id < off + n' -> constructVec'' s (id-(fromIntegral off)) n (fromIntegral off)
+                            4 | id >= off && id < off + n -> constructVec'' s (id-(fromIntegral off)) n (fromIntegral off)
                             4 -> DMat 15 (Remote ((fromIntegral off) + (fromIntegral id)) [A])
                                          (Remote ((fromIntegral off) + (fromIntegral id) + 1) [B])
                                          (Remote ((fromIntegral off) + (fromIntegral id) + 2) [C])
@@ -63,10 +63,10 @@ constructVec' s id n off = case n of
 constructVec'' s id n off = mat
   where
     mat = case id of
-            0 -> DMat 1 (Concrete $ Sparse $ S.fromList $ go 0 (s `div` 2) []) (Remote (off + 1) [B]) (Remote (off + 2) [C]) (Remote (off + 3) [D])
+            0 -> DMat 1 (Concrete $ Sparse $ S.fromList $ go 0 s []) (Remote (off + 1) [B]) (Remote (off + 2) [C]) (Remote (off + 3) [D])
             1 -> DMat 2 (Remote (off + 0) [A]) (Concrete Zero) (Remote (off + 2) [C]) (Remote (off + 3) [D]) 
-            2 -> DMat 4 (Remote (off + 0) [A]) (Remote (off + 1) [B]) (Concrete Zero) (Remote (off + 3) [D])
-            3 -> DMat 8 (Remote (off + 0) [A]) (Remote (off + 1) [B]) (Remote (off + 2) [C]) (Concrete $ Sparse $ S.fromList $ go 0 (s `div` 2) [])
+            2 -> DMat 4 (Remote (off + 0) [A]) (Remote (off + 1) [B]) (Concrete $ Sparse $ S.fromList $ go 0 s []) (Remote (off + 3) [D])
+            3 -> DMat 8 (Remote (off + 0) [A]) (Remote (off + 1) [B]) (Remote (off + 2) [C]) (Concrete Zero)
     go x e xs | x >= e = xs
     go x e xs = go (x+1) e ((S.Key 0 x, 1):xs)
 
@@ -74,7 +74,7 @@ zeros :: MElement a => Int -> Int -> Int -> DMat a
 zeros s id n = zeros' s id n 0
 
 zeros' s id n off = case n of 
-                            4 | id >= off && id < off + n' -> zeros'' s (id-(fromIntegral off)) n (fromIntegral off)
+                            4 | id >= off && id < off + n -> zeros'' s (id-(fromIntegral off)) n (fromIntegral off)
                             4 -> DMat 15 (Remote ((fromIntegral off) + (fromIntegral id)) [A])
                                          (Remote ((fromIntegral off) + (fromIntegral id) + 1) [B])
                                          (Remote ((fromIntegral off) + (fromIntegral id) + 2) [C])
