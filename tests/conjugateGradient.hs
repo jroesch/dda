@@ -17,7 +17,7 @@ conjugateGradient mat x b = do
     lift $ print $ "$$$ " ++ show tmp
     lift $ print "----------------------"
     lift $ threadDelay 10000
-    return $ mat
+    return $ tmp
     -- tmp <- mat .* b
     -- lift $ print "$$$$$$$$$$$$$$$$$$$$$$"
     -- lift $ threadDelay 10000

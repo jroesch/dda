@@ -28,7 +28,7 @@ requestMatrix :: MElement a => DT.PID -> Arg -> [Q] -> Requests a (DMat a)
 requestMatrix pid dir quad = do
     chan <- R.ask
     lift $ DT.sendTo pid (Request dir quad)
-    cmat <- lift $ lift $ Chan.readChan chan
+    !cmat <- lift $ lift $ Chan.readChan chan
     return $ Concrete cmat
 
 respondMatrix :: MElement a => CMat a -> (DT.DProcess (DMatMessage a)) -> IO ()
@@ -64,7 +64,7 @@ setupResponders pid chan (l, r) procs sem =
           case msg of
             Finish -> do
               print $ show pid ++ " finished"
-              respondLoop process
+              -- respondLoop process
               return ()
             Sync -> DT.writeP process Finish >> respondLoop process
             Response cmat -> do
