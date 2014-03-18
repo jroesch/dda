@@ -99,8 +99,8 @@ instance (SI.Arrayed a, Cereal.Serialize a, D.Element a)  => (Cereal.Serialize (
 
 -- | A distributed matrix representing a quad tree, a remote piece or a local piece.
 data DMat a = DMat !Int !(DMat a) !(DMat a) !(DMat a) !(DMat a)
-            | Remote DT.PID [Q]
-            | Concrete (CMat a)
+            | Remote !DT.PID ![Q]
+            | Concrete !(CMat a)
             deriving (Show, Generic)
 
 instance (SI.Arrayed a, Cereal.Serialize a, D.Element a)  => (Cereal.Serialize (DMat a))
@@ -113,8 +113,8 @@ data Arg = L | R deriving (Eq, Show, Generic)
 
 instance Cereal.Serialize Arg
 
-data DMatMessage a = Request Arg [Q]
-                   | Response (CMat a)
+data DMatMessage a = Request !Arg ![Q]
+                   | Response !(CMat a)
                    | Sync
                    | Finish
                    deriving (Show, Generic)
