@@ -6,6 +6,7 @@ import Distribute (Distribute)
 import Control.Monad
 import Control.Monad.Trans.State as S
 import Foreign.Storable.Tuple
+import System.Environment
 
 conjugateGradient :: DMat Double -> DMat Double -> DMat Double -> Distribute (DMatMessage Double) (DMat Double)
 conjugateGradient mat x b = do
@@ -29,9 +30,11 @@ conjugateGradient mat x b = do
     ddot :: DMat Double -> DMat Double -> Distribute (DMatMessage Double) Double
     ddot x y = (transpose x) .* y >>= topleft
 
+main :: IO ()
 main = do
-    (id, _) <- S.get
-    compute id procs $ do
+    args <- getArgs
+    compute (read (args !! 0)) procs $ do
+      (id, _) <- S.get
       let n   = 4
           mat = constructMat 1024 id n
           vec = constructVec 1024 id n

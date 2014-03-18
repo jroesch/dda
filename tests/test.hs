@@ -18,6 +18,7 @@ import qualified Sparse.Matrix
 import Data.Packed
 import Control.Monad.Trans (lift)
 import Control.Concurrent
+import Test.QuickCheck
 import Test.QuickCheck.Arbitrary
 import Instances
 
@@ -30,10 +31,10 @@ qcProps = testGroup "QuickCheck" [
     property_sparse_dense_mult,
     property_sparse_mult ]
 
-property_sparse_dense_add = QC.testProperty "sparse + dense" test
+property_sparse_dense_add = undefined -- QC.testProperty "sparse + dense" p_sparse_dense_add
 
 p_sparse_dense_add :: CMat Int -> CMat Int -> Gen Prop
-p_sparse_dense_add x y =
+p_sparse_dense_add x y = undefined
 
 property_sparse_dense_mult = QC.testProperty "sparse * dense" (undefined :: String -> Bool)
 
@@ -48,7 +49,7 @@ property_sparse_mult = QC.testProperty "sparse * sparse" (undefined :: String ->
       assertEqual "expecting identity" mat' result -}
 
 test_sync = HU.testCase "sync should allow for messages to be received by all processes" test
-  where test = do
+  where test = undefined {- do
           reg1 <- DT.emptyRegistry :: IO (DT.Registry (DMatMessage Double))
           reg2 <- DT.emptyRegistry :: IO (DT.Registry (DMatMessage Double))
           let mat = constructMat 10 0 4 -- right here
@@ -68,4 +69,4 @@ test_sync = HU.testCase "sync should allow for messages to be received by all pr
             sync (mat2, mat2) (requestMatrix 0 L [A])
             return ()
 
-          return ()
+          return () -}
