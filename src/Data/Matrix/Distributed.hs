@@ -30,9 +30,10 @@ compute pid procs action = do
         let state = (ppid, reg)
         forkIO $ DT.runDistribute state $ do
           DT.start port (DT.registerIncoming state)
-          when (ppid < pid) $ do
-            DT.open host port
-            return ()
+          forM_ procs $ \(p, host, port) ->
+            when (p < ppid) $ do
+              DT.open host port
+              return ()
           action
         return ()
 
