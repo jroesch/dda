@@ -4,7 +4,7 @@ import Data.Matrix.Distributed.Builder
 import Data.Matrix.Distributed
 import Distribute (Distribute)
 import Control.Monad
-import Control.Monad.Trans.State as S
+import Control.Monad.Trans.State.Strict as S
 import Control.Monad.Trans
 import Foreign.Storable.Tuple
 import System.Environment
