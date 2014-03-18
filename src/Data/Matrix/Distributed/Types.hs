@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveGeneric, DefaultSignatures, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies, UndecidableInstances, OverlappingInstances, ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies, UndecidableInstances, OverlappingInstances #-}
 module Data.Matrix.Distributed.Types
   ( DMat(..)
   , CMat(..)
@@ -53,16 +53,6 @@ instance ( SI.Arrayed a
          , Show a
          ) =>  MElement a
 
-{- instance Cereal.Serialize a => (Cereal.Serialize (S.Arr a a)) where
-  get = undefined
-  put = undefined -}
-
-{- instance ((S.Arr a ~ array), Cereal.Serialize a)  => (Cereal.Serialize (array a)) where
-    get = do
-      kvs <- get
-      return $ S.fromList kvs
-    put =   -- Cereal.put :: Cereal.Putter (array a) -}
-
 instance Cereal.Serialize S.Key where
     get = do
       w1 <- Cereal.get
@@ -73,27 +63,9 @@ instance Cereal.Serialize S.Key where
       Cereal.put w1
       Cereal.put w2
 
--- This really shouldn't type check this some hacky shit
-instance (SI.Arrayed a, SI.Arr a ~ array, Cereal.Serialize a) => (Cereal.Serialize (S.Mat a)) where
-    get = do
-      pairs <- Cereal.get
-      let vec = H.fromList pairs
-      return $ S._Mat # vec
-    
-    {- do
-      size <- Cereal.get
-      k1 <- Cereal.get
-      k2 <- Cereal.get
-      content <- Cereal.get :: Cereal.Get (array a)
-      return $ S.Mat size k1 k2 content -}
-
+instance (SI.Arrayed a, Cereal.Serialize a) => (Cereal.Serialize (S.Mat a)) where
+    get = (\x -> S._Mat # H.fromList x) `fmap` Cereal.get
     put mat = Cereal.put $ H.toList $ L.from S._Mat # mat
-
-{- do
-      Cereal.put size
-      Cereal.put k1
-      Cereal.put k2
-      Cereal.put (content :: array a) -}
 
 instance (Cereal.Serialize a, D.Element a) => (Cereal.Serialize (D.Matrix a)) where
     -- can most likely get better performance here with unsafeIO and
@@ -117,9 +89,6 @@ instance (Cereal.Serialize a, D.Element a) => (Cereal.Serialize (D.Matrix a)) wh
         DS.freezeMatrix mmat
         return $ foldl (>>) (Cereal.put r >> Cereal.put c) puts
 
--- sparse matrix based on peano ordering
---                      top left  top right bottom left bottom right
-
 -- | A concrete matrix either dense, or sparse, zero
 data CMat a = Dense (D.Matrix a)
             | Sparse (S.Mat a)
@@ -128,7 +97,7 @@ data CMat a = Dense (D.Matrix a)
 
 instance (SI.Arrayed a, Cereal.Serialize a, D.Element a)  => (Cereal.Serialize (CMat a))
 
--- | A distributed matrix
+-- | A distributed matrix representing a quad tree, a remote piece or a local piece.
 data DMat a = DMat !Int !(DMat a) !(DMat a) !(DMat a) !(DMat a)
             | Remote DT.PID [Q]
             | Concrete (CMat a)

@@ -18,7 +18,8 @@ import qualified Sparse.Matrix
 import Data.Packed
 import Control.Monad.Trans (lift)
 import Control.Concurrent
-
+import Test.QuickCheck.Arbitrary
+import Instances
 
 main = defaultMain $ testGroup "Tests" [unitTests] -- [qcProps]
 
@@ -30,7 +31,9 @@ qcProps = testGroup "QuickCheck" [
     property_sparse_mult ]
 
 property_sparse_dense_add = QC.testProperty "sparse + dense" test
-  where prop x y = 
+
+p_sparse_dense_add :: CMat Int -> CMat Int -> Gen Prop
+p_sparse_dense_add x y =
 
 property_sparse_dense_mult = QC.testProperty "sparse * dense" (undefined :: String -> Bool)
 
@@ -50,27 +53,19 @@ test_sync = HU.testCase "sync should allow for messages to be received by all pr
           reg2 <- DT.emptyRegistry :: IO (DT.Registry (DMatMessage Double))
           let mat = constructMat 10 0 4 -- right here
           let mat2 = constructMat 10 1 4 -- right here
-          print mat
-          print "---------------"
-          print mat2
-          print "---------------"
           -- Need some kind of data here
           forkIO $ (flip ST.evalStateT) (0, reg1) $ do
             st <- ST.get
             DT.start 3000 (DT.registerIncoming st)
-            ST.lift $ putStrLn "above sync"
             lift $ threadDelay 1000
             sync (mat, mat) (requestMatrix 1 L [B])
-            ST.lift $ putStrLn "Done1"
             return ()
 
           (flip ST.evalStateT) (1, reg2)  $ do
             st' <- ST.get
             DT.start 4000 (DT.registerIncoming st')
             DT.open "localhost" 3000
-            ST.lift $ putStrLn "above sync"
             sync (mat2, mat2) (requestMatrix 0 L [A])
-            ST.lift $ putStrLn "DOne2"
             return ()
 
           return ()

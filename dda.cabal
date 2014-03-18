@@ -93,4 +93,5 @@ test-suite test
     tasty,
     tasty-quickcheck,
     tasty-hunit,
-    dda
+    dda,
+    containers

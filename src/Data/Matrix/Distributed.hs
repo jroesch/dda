@@ -22,18 +22,23 @@ import qualified Control.Monad.State as S
 import Control.Monad.Trans (lift)
 import Control.Concurrent
 
-topleft :: (MElement a) => DMat a -> a
-topleft mat = case mat of
-                Concrete (Dense smat) -> smat @@> (0,0)
-                Concrete (Sparse smat) -> let list = filter (\(S.Key a b, _) -> a == 0 && b == 0$ (from S._Mat) # smat
-                                              in case list of
-                                                   [] -> 0
-                                                   [(S.Key _ _, v)] -> v --TODO send to all here
-                Concrete Zero -> 0
-                Remote pid _ -> recieve -- TODO: recive from owner here
-                DMat _ smat _ _ _ -> topleft smat
+compute :: (MElement a ) => DT.PID -> Distribute (DMatMessage a) () -> IO ()
+compute pid action = do
+    reg <- DT.emptyRegistry
+    DT.runDistribute (pid, reg) action
 
-opOnNonZeros :: (Storable a, S.Arrayed a) => (a -> a) -> DMat a -> DMat a
+topleft :: (MElement a) => DMat a -> Distribute (DMatMessage a) a
+topleft m = sync (m, m) (unsafeTopLeft m)
+  where
+    unsafeTopLeft (Concrete (Dense smat)) = undefined -- return $ smat @@> (0,0)
+    unsafeTopLeft (Concrete (Sparse smat)) = undefined --TODO: TK CHECK OUT send to all here
+    unsafeTopLeft (Concrete Zero) = return 0
+    unsafeTopLeft r @ (Remote pid quad) = do
+        mat <- requestMatrix pid L quad
+        unsafeTopLeft mat
+    unsafeTopLeft (DMat _ smat _ _ _) = unsafeTopLeft smat
+
+opOnNonZeros :: (MElement a) => (a -> a) -> DMat a -> DMat a
 opOnNonZeros op (Concrete (Dense smat)) = Concrete $ Dense $ D.mapMatrix op smat
 opOnNonZeros op (Concrete (Sparse smat)) =
   Concrete $ Sparse $ (smat & S._Mat %~ H.map (\(k, b) -> (k, op b)))
@@ -72,12 +77,12 @@ transpose (DMat mask tl tr bl br) =
 
 -- sparse-dense elementwise multiply zero * somehting = zero
 -- resulting array is sparse
-sdMult :: (Num a, S.Eq0 a, Storable a) => (a -> a -> a) -> S.Mat a -> D.Matrix a -> S.Mat a
+sdMult :: MElement a => (a -> a -> a) -> S.Mat a -> D.Matrix a -> S.Mat a
 sdMult op a b = a & S._Mat %~ H.map (\(S.Key r c, d) -> (S.Key r c, d `op` (b @@> (fromIntegral r, fromIntegral c))))
 
 -- TODO: am i accidentaly transposing
 -- sparse-desnse add yields dense (we assume not too many zeros are created)
-sdAdd :: (Num a, S.Eq0 a, Storable a) => (a -> a -> a) -> S.Mat a -> D.Matrix a -> D.Matrix a
+sdAdd :: MElement a => (a -> a -> a) -> S.Mat a -> D.Matrix a -> D.Matrix a
 sdAdd op a b = (height><width) $ V.toList resV
   where
     sparse = a ^. S._Mat
