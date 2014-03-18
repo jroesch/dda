@@ -51,6 +51,8 @@ compute pid procs action = do
             return ()
         return ()
 
+startProcess = undefined
+
 topleft :: (MElement a) => DMat a -> Distribute (DMatMessage a) a
 topleft m = sync (m, m) (unsafeTopLeft m)
   where
@@ -183,24 +185,24 @@ down delta (Semaphore mvar mcount total) = do
 
 dadd :: MElement a => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
 dadd r l = sync (l, r) $ (dadd' l r)
-    where 
-      dadd' (Concrete cmat1) (Concrete cmat2) =
-        return $ Concrete $ sadd cmat1 cmat2
-      dadd' (Remote pid quad) (Remote pid' quad') =
-        return $ Remote pid quad
-      dadd' l @ (Remote pid quad) mat = do
-        rmat <- requestMatrix pid R quad
-        lift $ dadd rmat mat
-      dadd' mat r @ (Remote pid quad) = do
-        rmat <- requestMatrix pid L quad
-        lift $ dadd mat rmat
-      dadd' (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
-          let mask = m1 .&. m2
-          tl <- ternary (firstQ mask) (return l1) (dadd' l1 r1)
-          tr <- ternary (secondQ mask) (return l2) (dadd' l2 r2)
-          bl <- ternary (thirdQ mask) (return l3) (dadd' l3 r3)
-          br <- ternary (fourthQ mask) (return l4) (dadd' l4 r4)
-          return $ DMat mask tl tr bl br
+ 
+dadd' (Concrete cmat1) (Concrete cmat2) =
+    return $ Concrete $ sadd cmat1 cmat2
+dadd' (Remote pid quad) (Remote pid' quad') =
+    return $ Remote pid quad
+dadd' l @ (Remote pid quad) mat = do
+    rmat <- requestMatrix pid R quad
+    dadd' rmat mat
+dadd' mat r @ (Remote pid quad) = do
+    rmat <- requestMatrix pid L quad
+    dadd' mat rmat
+dadd' (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
+    let mask = m1 .&. m2
+    tl <- ternary (firstQ mask) (return l1) (dadd' l1 r1)
+    tr <- ternary (secondQ mask) (return l2) (dadd' l2 r2)
+    bl <- ternary (thirdQ mask) (return l3) (dadd' l3 r3)
+    br <- ternary (fourthQ mask) (return l4) (dadd' l4 r4)
+    return $ DMat mask tl tr bl br
 
 -- elementwise operations
 
@@ -254,26 +256,28 @@ infixr 7 .*
 (.*) = dmult
 
 dmult :: (MElement a) => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
-dmult (Concrete cmat1) (Concrete cmat2) =
-    return $ Concrete $ smult cmat1 cmat2
-dmult l @ (Remote pid quad) mat = sync (l, mat) $ do
-    rmat <- requestMatrix pid L quad
-    lift $ dmult rmat mat
-dmult mat r @ (Remote pid quad) = sync (mat, r) $ do
-    rmat <- requestMatrix pid R quad
-    lift $ dmult mat rmat
-dmult (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
-    let mask = m1 .&. m2
-    topLeft <- ternary (firstQ mask) (return l1) $
-      CM.join $ (liftM2 dadd) (dmult l1 r1) (dmult l2 r3)
-    topRight <- ternary (secondQ mask) (return l2) $
-      CM.join $ (liftM2 dadd) (dmult l1 r2) (dmult l2 r4)
-    bottomLeft <- ternary (thirdQ mask) (return l3) $
-      CM.join $ (liftM2 dadd) (dmult l3 r1) (dmult l4 r3)
-    bottomRight <- ternary (fourthQ mask) (return l4) $
-      CM.join $ (liftM2 dadd) (dmult l3 r2) (dmult l4 r4)
-    return $ DMat mask topLeft topRight bottomLeft bottomRight
-dmult _ _ = error "undefined behavior"
+dmult r l = sync (r, l) (dmult' r l)
+  where 
+    dmult' (Concrete cmat1) (Concrete cmat2) =
+        return $ Concrete $ smult cmat1 cmat2
+    dmult' l @ (Remote pid quad) mat = do
+        rmat <- requestMatrix pid L quad
+        dmult' rmat mat
+    dmult' mat r @ (Remote pid quad) = do
+        rmat <- requestMatrix pid R quad
+        dmult' mat rmat
+    dmult' (DMat m1 l1 l2 l3 l4) (DMat m2 r1 r2 r3 r4) = do
+        let mask = m1 .&. m2
+        topLeft <- ternary (firstQ mask) (return l1) $
+          CM.join $ (liftM2 dadd') (dmult' l1 r1) (dmult' l2 r3)
+        topRight <- ternary (secondQ mask) (return l2) $
+          CM.join $ (liftM2 dadd') (dmult' l1 r2) (dmult' l2 r4)
+        bottomLeft <- ternary (thirdQ mask) (return l3) $
+          CM.join $ (liftM2 dadd') (dmult' l3 r1) (dmult' l4 r3)
+        bottomRight <- ternary (fourthQ mask) (return l4) $
+          CM.join $ (liftM2 dadd') (dmult' l3 r2) (dmult' l4 r4)
+        return $ DMat mask topLeft topRight bottomLeft bottomRight
+    dmult' _ _ = error "undefined behavior"
 
 ternary :: Bool -> r -> r -> r
 ternary False a _ = a
