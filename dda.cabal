@@ -65,6 +65,8 @@ test-suite cg
     sparse,
     distribute,
     tasty,
+    storable-tuple,
+    transformers,
     tasty-quickcheck,
     tasty-hunit,
     dda
