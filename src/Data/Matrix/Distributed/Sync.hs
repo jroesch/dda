@@ -26,13 +26,13 @@ type Requests a b = ReaderT (Chan (CMat a)) (Distribute (DMatMessage a)) b
 
 requestMatrix :: MElement a => DT.PID -> Arg -> [Q] -> Requests a (DMat a)
 requestMatrix pid dir quad = do
-    chan <- R.ask
+    !chan <- R.ask
     lift $ DT.sendTo pid (Request dir quad)
     !cmat <- lift $ lift $ Chan.readChan chan
     return $ Concrete cmat
 
 respondMatrix :: MElement a => CMat a -> (DT.DProcess (DMatMessage a)) -> IO ()
-respondMatrix cmat process = DT.writeP process (Response cmat)
+respondMatrix !cmat process = DT.writeP process (Response cmat)
 
 sync :: MElement a => (DMat a, DMat a) -> Requests a b -> Distribute (DMatMessage a) b
 sync args requests = do
@@ -43,11 +43,15 @@ sync args requests = do
     semaphore <- lift $ Sem.new (length procs)
     chan <- lift $ Chan.newChan
     lift $ setupResponders pid chan args procs semaphore
-    -- lift $ yield
+    lift $ yield
     lift $ print 5
     !result <- runReaderT requests chan -- hanging here
+    lift $ yield
+    lift $ yield
+    lift $ yield
     lift $ print 6
     DT.broadcast Finish
+    lift $ yield
     lift $ print 7
     lift $ print $ show pid ++ " broadcasted finish"
     lift $ Sem.wait semaphore (numOfProcs)
@@ -59,7 +63,7 @@ setupResponders pid chan (l, r) procs sem =
     forM_ procs $ \p ->
       forkIO $ Sem.with sem 1 (respondLoop p)
   where respondLoop process = do
-          msg <- DT.readP process
+          !msg <- DT.readP process
           print $ show pid ++ " got " ++ show msg
           case msg of
             Finish -> do

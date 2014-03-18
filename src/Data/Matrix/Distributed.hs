@@ -259,7 +259,7 @@ infixr 7 .*
 (.*) = dmult
 
 dmult :: (MElement a) => DMat a -> DMat a -> Distribute (DMatMessage a) (DMat a)
-dmult l r = sync (l, r) (dmult' l r)
+dmult !l !r = sync (l, r) (dmult' l r)
   where 
     dmult' (Concrete cmat1) (Concrete cmat2) =
         return $ Concrete $ smult cmat1 cmat2

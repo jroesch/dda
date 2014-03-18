@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 import Data.Matrix.Distributed.Types
 import Data.Matrix.Distributed.Builder
 import Data.Matrix.Distributed
@@ -13,21 +13,21 @@ import Control.Concurrent
 conjugateGradient :: DMat Double -> DMat Double -> DMat Double -> Distribute (DMatMessage Double) (DMat Double)
 conjugateGradient mat x b = do
     lift $ print 1
-    tmp <- mat .* b
+    !tmp <- mat .* b
     lift $ print $ "$$$ " ++ show tmp
     lift $ print "----------------------"
     lift $ threadDelay 10000
-    return $ tmp
+    -- return $ tmp
     -- tmp <- mat .* b
-    -- lift $ print "$$$$$$$$$$$$$$$$$$$$$$"
-    -- lift $ threadDelay 10000
-    -- rtr <- ddot b b
-    -- lift $ print 2
-    -- let norm = sqrt rtr
-    -- lift $ print 3
-    -- lift $ print $ ">>>>>>>>>>>>>>>>>>>>>> " ++ show norm
-    -- lift $ print 4
-    -- cg mat x b b rtr 0 norm
+    lift $ print "$$$$$$$$$$$$$$$$$$$$$$"
+    lift $ threadDelay 10000
+    rtr <- ddot b b
+    lift $ print 2
+    let norm = sqrt rtr
+    lift $ print 3
+    lift $ print $ ">>>>>>>>>>>>>>>>>>>>>> " ++ show norm
+    lift $ print 4
+    cg mat x b b rtr 0 norm
   where
     cg :: DMat Double -> DMat Double -> DMat Double -> DMat Double -> Double -> Int -> Double -> Distribute (DMatMessage Double) (DMat Double)
     cg mat x d r rtr iters norm = if iters /= 0 && ((sqrt rtr) / norm < 1e-6 || iters > 100)
