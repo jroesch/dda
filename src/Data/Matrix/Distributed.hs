@@ -24,17 +24,24 @@ import Control.Concurrent
 
 compute :: (MElement a) => DT.PID -> [(DT.PID, String, Int)] -> Distribute (DMatMessage a) () -> IO ()
 compute pid procs action = do
-    forM_ procs $ \(ppid, host, port) ->
-      when (host == "localhost") $ do
+    forM_ procs $ \(pid1, host1, port1) -> do
+      putStrLn ("Starting up :" ++ (show pid1))
+      when (host1 == "localhost") $ do
         reg <- DT.emptyRegistry
-        let state = (ppid, reg)
+        let state = (pid1, reg)
         forkIO $ DT.runDistribute state $ do
-          DT.start port (DT.registerIncoming state)
-          forM_ procs $ \(p, host, port) ->
-            when (p < ppid) $ do
-              DT.open host port
+          DT.start port1 (DT.registerIncoming state)
+          lift $ threadDelay 1000
+          forM_ procs $ \(pid2, host2, port2) -> do
+            lift $ print pid2
+            when (pid2 < pid1) $ do
+              lift $ print $ "trying to connect to " ++ (show (pid2, pid1))
+              DT.open host2 port2
+              lift $ threadDelay 10000
               return ()
+          lift $ threadDelay 10000
           action
+          return ()
         return ()
 
 topleft :: (MElement a) => DMat a -> Distribute (DMatMessage a) a
