@@ -21,6 +21,8 @@ import qualified Data.Serialize as Cereal
 import qualified Control.Monad.State as S
 import Control.Monad.Trans (lift)
 import Control.Concurrent
+import Control.Monad.Catch
+import qualified Data.Map as Map
 
 compute :: (MElement a) => DT.PID -> [(DT.PID, String, Int)] -> Distribute (DMatMessage a) () -> IO ()
 compute pid procs action = do
@@ -34,22 +36,33 @@ compute pid procs action = do
         -- putStrLn "At thread start"
         DT.runDistribute state $ do
           DT.start port1 (DT.registerIncoming state)
-          lift $ threadDelay 10000000
           forM_ procs $ \(pid2, host2, port2) -> do
             lift $ print (pid1, pid2)
             when (pid2 < pid1) $ do
               -- lift $ putStrLn $ (show pid1) ++ " trying to connect to " ++ show pid2 ++ "  " ++ host2 ++ ":" ++ show port2
-              DT.open host2 port2
+              let connect = catchIOError (DT.open host2 port2) (\_ -> do
+                                                                        lift $ threadDelay 1000
+                                                                        connect)
+              connect
               -- lift $ print $ show pid1 ++ " connected to " ++ show pid2
               return ()
             return ()
-          lift $ threadDelay 10000000
           -- lift $ putStrLn $ show pid ++ " is setup"
           -- lift $ putStrLn "Running Action"
           action
           -- lift $ putStrLn "Done Action"
           return ()
         return ()
+  where
+    waitEveryone = do
+          (_, reg) <- S.get
+          r <- lift $ readMVar reg
+          if Map.size r == length procs - 1
+            then return ()
+            else do
+              lift $ threadDelay 1000
+              waitEveryone
+
 
 startProcess = undefined
 
