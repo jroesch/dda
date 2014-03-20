@@ -43,6 +43,7 @@ compute pid procs action = do
               lift $ print $ show pid1 ++ " connected to " ++ show pid2
               return ()
             return ()
+          lift $ threadDelay 10000
           lift $ putStrLn $ show pid ++ " is setup"
           lift $ putStrLn "Running Action"
           action
