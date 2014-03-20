@@ -32,5 +32,4 @@ main = do
       lift $ print "----------------"
       lift $ print m'
       return ()
-    threadDelay 10000000
     return ()
