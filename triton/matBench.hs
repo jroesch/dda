@@ -25,7 +25,7 @@ main = do
         procs = zip3 [0..] nodes (repeat 3000)
 
     putStrLn "Starting up"
-    n:xs <- getArgs
+    Just n <- lookupEnv "NUMBER"
     timeIt $ compute rank procs $ do
       let mat :: DMat Double = constructMat (read n) rank size
       lift $ print $ show rank ++ " " ++ show mat
