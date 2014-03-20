@@ -26,8 +26,8 @@ compute :: (MElement a) => DT.PID -> [(DT.PID, String, Int)] -> Distribute (DMat
 compute pid procs action = do
     a <- newMVar ()
     forM_ procs $ \(pid1, host1, port1) -> do
-      putStrLn ("Starting up :" ++ (show pid1))
       when (pid1 == pid) $ do
+        putrStrLn $ show pid1 ++ " starting up on " ++ show host1 ++ ":" ++ show port1
         putStrLn $ "At registry with host: " ++ (host1)
         reg <- DT.emptyRegistry
         let state = (pid1, reg)
