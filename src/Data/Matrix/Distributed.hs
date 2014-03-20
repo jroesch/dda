@@ -27,7 +27,7 @@ compute pid procs action = do
     a <- newMVar ()
     forM_ procs $ \(pid1, host1, port1) -> do
       putStrLn ("Starting up :" ++ (show pid1))
-      when (host1 == "localhost") $ do
+      when (pid1 == pid) $ do
         putStrLn $ "At registry with host: " ++ (host1)
         reg <- DT.emptyRegistry
         let state = (pid1, reg)
