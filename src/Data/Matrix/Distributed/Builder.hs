@@ -36,14 +36,14 @@ constructMat'' s id n off side = mat
 
 constructMat' s id n off side = case n of 
                             4 | id >= off && id < off + n -> constructMat'' s (id-(fromIntegral off)) n (fromIntegral off) side
-                            4 -> DMat 15 (Remote ((fromIntegral off) + (fromIntegral id)) (side ++ [A]))
-                                         (Remote ((fromIntegral off) + (fromIntegral id) + 1) (side ++ [B]))
-                                         (Remote ((fromIntegral off) + (fromIntegral id) + 2) (side ++ [C]))
-                                         (Remote ((fromIntegral off) + (fromIntegral id) + 3) (side ++ [D]))
-                            _ -> DMat 15 (constructMat' s id n' 0 (side ++ [A]))
-                                         (constructMat' s id n' n' (side ++ [B]))
-                                         (constructMat' s id n' (2*n') (side ++ [C]))
-                                         (constructMat' s id n' (3*n') (side ++ [D]))
+                            4 -> DMat 15 (Remote (fromIntegral off) (side ++ [A]))
+                                         (Remote ((fromIntegral off) + 1) (side ++ [B]))
+                                         (Remote ((fromIntegral off) + 2) (side ++ [C]))
+                                         (Remote ((fromIntegral off) + 3) (side ++ [D]))
+                            _ -> DMat 15 (constructMat' s id n' (off) (side ++ [A]))
+                                         (constructMat' s id n' (off + n') (side ++ [B]))
+                                         (constructMat' s id n' (off + 2*n') (side ++ [C]))
+                                         (constructMat' s id n' (off + 3*n') (side ++ [D]))
   where
     n' = n `div` 4
 
