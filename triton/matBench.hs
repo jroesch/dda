@@ -22,11 +22,13 @@ main = do
     let nodes =  map (++ ".sdsc.edu") $ splitOn "\n" nodes'
         procs = zip3 [0..] nodes (repeat 3000)
 
+    putStrLn "Starting up"
     compute rank procs $ do
       let n   = 4
           mat :: DMat Double = constructMat 4 rank size
       lift $ print $ show rank ++ " " ++ show mat
       m' <- mat .* mat
+      lift $ print "----------------"
       lift $ print m'
       return ()
     threadDelay 10000000

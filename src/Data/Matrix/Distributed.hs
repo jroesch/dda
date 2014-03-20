@@ -32,24 +32,21 @@ compute pid procs action = do
         reg <- DT.emptyRegistry
         let state = (pid1, reg)
         putStrLn "At thread start"
-        forkIO $ do
-          -- takeMVar a
-          DT.runDistribute state $ do
-            DT.start port1 (DT.registerIncoming state)
-            lift $ threadDelay 1000
-            forM_ procs $ \(pid2, host2, port2) -> do
-              lift $ print (pid1, pid2)
-              when (pid2 < pid1) $ do
-                lift $ print $ (show pid1) ++ " trying to connect to " ++ (show pid2)
-                DT.open host2 port2
-                lift $ print $ show pid1 ++ " connected to " ++ show pid2
-                return ()
-              lift $ putStrLn "Letting go"
-            -- lift $ putMVar a ()
-            lift $ putStrLn "Running Action"
-            action
-            lift $ putStrLn "Done Action"
-            return ()
+        DT.runDistribute state $ do
+          DT.start port1 (DT.registerIncoming state)
+          lift $ threadDelay 10000
+          forM_ procs $ \(pid2, host2, port2) -> do
+            lift $ print (pid1, pid2)
+            when (pid2 < pid1) $ do
+              lift $ print $ (show pid1) ++ " trying to connect to " ++ (show pid2)
+              DT.open host2 port2
+              lift $ print $ show pid1 ++ " connected to " ++ show pid2
+              return ()
+            lift $ putStrLn "Letting go"
+          lift $ putStrLn "Running Action"
+          action
+          lift $ putStrLn "Done Action"
+          return ()
         return ()
 
 startProcess = undefined
