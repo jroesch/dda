@@ -29,13 +29,13 @@ compute pid procs action = do
     -- a <- newMVar ()
     forM_ procs $ \(pid1, host1, port1) -> do
       when (pid1 == pid) $ do
-        putStrLn $ show pid1 ++ " starting up on " ++ host1 ++ ":" ++ show port1
         -- putStrLn $ "At registry with host: " ++ (host1)
         reg <- DT.emptyRegistry
         let state = (pid1, reg)
         -- putStrLn "At thread start"
         DT.runDistribute state $ do
           DT.start port1 (DT.registerIncoming state)
+          lift $ putStrLn $ show pid1 ++ " starting up on " ++ host1 ++ ":" ++ show port1
           lift $ threadDelay 10000 -- wait for everyone to start up
           forM_ procs $ \(pid2, host2, port2) -> do
             lift $ print (pid1, pid2)
