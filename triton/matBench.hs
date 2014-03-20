@@ -1,18 +1,33 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 import Data.Matrix.Distributed.Types
 import Data.Matrix.Distributed.Builder
 import Data.Matrix.Distributed
 
+import System.Environment
+import System.IO
+import Data.Functor
+import Data.List.Split
+import Control.Monad.Trans
+import Control.Concurrent
 
 main = do
-    args <- getArgs
-    compute (read (args !! 0)) procs $ do
-      (id, _) <- S.get
+    Just rank' <- lookupEnv "OMPI_COMM_WORLD_RANK"
+    Just size' <- lookupEnv "OMPI_COMM_WORLD_SIZE"
+    let rank = read rank'
+        size = read size'
+    Just nodeFile <- lookupEnv "PBS_NODEFILE"
+    -- hostname <- getHostName
+    -- putStrLn $ hostname ++ " is " ++ show rank
+    Just nodes' <- lookupEnv "NODES"
+    let nodes =  map (++ ".sdsc.edu") $ splitOn "\n" nodes'
+        procs = zip3 [0..] nodes (repeat 3000)
+
+    compute rank procs $ do
       let n   = 4
-          mat = constructMat 4 id n
-      lift $ print $ show id ++ " " ++ show mat
-      lift $ print $ show id ++ " " ++ show vec
-      lift $ print $ show id ++ " " ++ show zer
+          mat :: DMat Double = constructMat 4 rank size
+      lift $ print $ show rank ++ " " ++ show mat
+      m' <- mat .* mat
+      lift $ print m'
       return ()
     threadDelay 10000000
     return ()
-  where procs = [(0, "localhost", 3000), (1, "localhost", 3001), (2, "localhost", 3002), (3, "localhost", 3003)]
