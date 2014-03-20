@@ -51,7 +51,10 @@ executable triton_bench
     base,
     dda,
     split,
-    mtl
+    mtl,
+    network
+  default-language:
+        Haskell2010
 
 test-suite cg
   default-language:

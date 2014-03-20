@@ -9,6 +9,7 @@ import Data.Functor
 import Data.List.Split
 import Control.Monad.Trans
 import Control.Concurrent
+import Network.BSD
 
 main = do
     Just rank' <- lookupEnv "OMPI_COMM_WORLD_RANK"
@@ -16,8 +17,8 @@ main = do
     let rank = read rank'
         size = read size'
     Just nodeFile <- lookupEnv "PBS_NODEFILE"
-    -- hostname <- getHostName
-    -- putStrLn $ hostname ++ " is " ++ show rank
+    hostname <- getHostName
+    putStrLn $ hostname ++ " is " ++ show rank
     Just nodes' <- lookupEnv "NODES"
     let nodes =  map (++ ".sdsc.edu") $ splitOn "\n" nodes'
         procs = zip3 [0..] nodes (repeat 3000)
