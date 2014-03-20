@@ -27,7 +27,7 @@ compute pid procs action = do
     a <- newMVar ()
     forM_ procs $ \(pid1, host1, port1) -> do
       when (pid1 == pid) $ do
-        putStrLn $ show pid1 ++ " starting up on " ++ show host1 ++ ":" ++ show port1
+        putStrLn $ show pid1 ++ " starting up on " ++ host1 ++ ":" ++ show port1
         putStrLn $ "At registry with host: " ++ (host1)
         reg <- DT.emptyRegistry
         let state = (pid1, reg)
@@ -38,7 +38,7 @@ compute pid procs action = do
           forM_ procs $ \(pid2, host2, port2) -> do
             lift $ print (pid1, pid2)
             when (pid2 < pid1) $ do
-              lift $ print $ (show pid1) ++ " trying to connect to " ++ (show pid2) ++ "  " ++ show host2 ++ ":" ++ show port2
+              lift $ putStrLn $ (show pid1) ++ " trying to connect to " ++ show pid2 ++ "  " ++ host2 ++ ":" ++ show port2
               DT.open host2 port2
               lift $ print $ show pid1 ++ " connected to " ++ show pid2
               return ()
