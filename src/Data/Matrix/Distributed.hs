@@ -42,7 +42,8 @@ compute pid procs action = do
               DT.open host2 port2
               lift $ print $ show pid1 ++ " connected to " ++ show pid2
               return ()
-          lift $ show pid ++ " is setup"
+            return ()
+          lift $ putStrLn $ show pid ++ " is setup"
           lift $ putStrLn "Running Action"
           action
           lift $ putStrLn "Done Action"
