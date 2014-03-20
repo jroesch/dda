@@ -38,11 +38,11 @@ compute pid procs action = do
           forM_ procs $ \(pid2, host2, port2) -> do
             lift $ print (pid1, pid2)
             when (pid2 < pid1) $ do
-              lift $ print $ (show pid1) ++ " trying to connect to " ++ (show pid2)
+              lift $ print $ (show pid1) ++ " trying to connect to " ++ (show pid2) ++ "  " ++ show host2 ++ ":" ++ show port2
               DT.open host2 port2
               lift $ print $ show pid1 ++ " connected to " ++ show pid2
               return ()
-            lift $ putStrLn "Letting go"
+          lift $ show pid ++ " is setup"
           lift $ putStrLn "Running Action"
           action
           lift $ putStrLn "Done Action"
