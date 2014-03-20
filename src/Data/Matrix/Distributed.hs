@@ -38,10 +38,9 @@ compute pid procs action = do
           lift $ putStrLn $ show pid1 ++ " starting up on " ++ host1 ++ ":" ++ show port1
           lift $ threadDelay 10000 -- wait for everyone to start up
           forM_ procs $ \(pid2, host2, port2) -> do
-            lift $ print (pid1, pid2)
             when (pid2 < pid1) $ do
               lift $ putStrLn $ (show pid1) ++ " trying to connect to " ++ show pid2 ++ "  " ++ host2 ++ ":" ++ show port2
-              let connect = catchIOError (DT.open host2 port2 >> (lift $ putStrLn "CONNECTED!!!")) (\err -> do
+              let connect = catchIOError (DT.open host2 port2 >> (lift $ putStrLn  $ pid1 ++ " CONNECTED!!! " ++ pid2)) (\err -> do
                                                                         lift $ putStrLn $ show pid1 ++ " reconnecting " ++ show pid2 ++ " after " ++ show err
                                                                         lift $ threadDelay 10000
                                                                         connect)
