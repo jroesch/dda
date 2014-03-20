@@ -42,7 +42,7 @@ compute pid procs action = do
               lift $ putStrLn $ (show pid1) ++ " trying to connect to " ++ show pid2 ++ "  " ++ host2 ++ ":" ++ show port2
               let connect = catchIOError (DT.open host2 port2 >> (lift $ putStrLn $ show pid1 ++ " CONNECTED!!! " ++ show pid2)) (\err -> do
                                                                         lift $ putStrLn $ show pid1 ++ " reconnecting " ++ show pid2 ++ " after " ++ show err
-                                                                        lift $ threadDelay 10000
+                                                                        lift $ threadDelay 100000
                                                                         connect)
               connect
               lift $ print $ show pid1 ++ " connected to " ++ show pid2
