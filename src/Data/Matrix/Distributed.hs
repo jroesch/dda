@@ -49,6 +49,7 @@ compute pid procs action = do
               return ()
             return ()
           waitEveryone
+          lift $ print "=========> DONE SYNCING <==========="
           -- lift $ putStrLn $ show pid ++ " is setup"
           -- lift $ putStrLn "Running Action"
           action
