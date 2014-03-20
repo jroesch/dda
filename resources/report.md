@@ -1,19 +1,21 @@
-# Final Project Report
+# CS240A: Final Project
 ### Jared Roesch and Tristan Konolige
 
 # Introduction
 
-In deciding on a topic for our project we wanted something interesting,
-and challenging to work on so that we would have incentives for continuing with
-it in the future. Given our backgrounds and intrest in functional languages
-we really wanted bring them to the table as well. We developed the impression
-that matrix multiplication was a serious component of many scientific applications.
-Therefor if you want to be useful in solving the problems any large scale parallel
-computing both from the material in the class, and our experiences with scientific computing.  
+In deciding on a topic for our project was hard as we wanted something interesting,
+and challenging so that there would be sufficient motivation for continuing with
+it in the future. Given our backgrounds and interest in functional languages, we
+wanted to bring them together into a single project. We felt that
+matrix multiplication in necessary piece of many scientific applications.
+Therefor targeting matrices would help one write algorithms for
+many parallel computing problems. This impression was reinforced both
+from the material in the class, and our previous experiences with
+scientific computing.  
 
   As we discussed in our original proposal the goal of our project was to enable
 both parallel and distributed matrix operations in Haskell. We enjoy dragging
-as much theory as possible back into the "real world" and see if we can appy it.
+as much theory as possible back into the "real world" and see if we can apply it.
 We copied this approach from the author of sparse who tried to do that with
 sparse matrix representation.
 implementation of parallel and distributed sparse matrices in Haskell. With the
@@ -33,19 +35,80 @@ without significant changes to the code.
 
 # Background
 
-- Repa, Par Monad, accelerate, spj works
-- CombBlas
-- quad trees
-- space filling curves
-- sparse, edkmett posts
+Haskell programmers are few and far between so we choose to spend time
+elaborating the features of Haskell that helped us most in our implementation.
 
 ## Haskell
 Haskell the language began as a though experiment of taking a pure, lazy language
 design and trying to produce something useful from it. Its long history has
-been documented in (History of Haskell) which talks about the various design
-choices that had been made over the first two decades of its life. The primary
-authors have also had a strong interest in enabling parallel performance. There
-is a long history of work such as (TODO: ADD PARALLEL PAPERS).
+been documented in A History of Haskell [^history-of-haskell], which talks
+about the various design choices that had been made over the first two decades
+of its life. The primary authors have also had a strong interest in enabling
+parallel performance.
+
+### Purity
+Purity is one of the initially puzzling features of Haskell. It
+provides some important properties:  
+
+    - referentially transparent
+    - immutable data structures
+    - no global state  
+
+### Laziness
+Laziness is another important property of Haskell that allows us to express
+a level of control over evaluation that is not normally available to a
+programmer.
+
+
+### Monads
+
+Monads are one of the other tools that make Haskell a great tool for writing
+code quickly and correctly. Monads are a structure from Category Theory
+but in practice are a useful abstraction (design pattern) for writing
+functional code. Monads are built upon two other simple primitives Functor,
+and Applicative. Haskell has a concept of "type classes" which are open
+interfaces that can be implemented at any time, by any type. Each has a simpe
+definition that is provided below.
+
+```haskell
+class Functor f where
+    fmap :: (a -> b) -> f a -> f b
+
+class (Functor f) => Applicative f where
+    pure :: a -> f a
+    (<*>) :: f (a -> b) -> f a -> f b
+
+class (Applicative m) => Monad m where
+    return = pure
+    (>>=) :: m a -> (a -> m b) -> m b
+    m1 >> m2 = m1 >>= \_ -> m2
+```
+
+This declares that for thing that for a Functor f if you provide me a
+transformation from a f parametrized by a to one parametrized by b.
+For example IO (the Monad representing input/output effects) forms
+a Functor: `fmap (+1) [1,2,3] == [2,3,4]`. Type classes allows one
+to write generic code over these interfaces and reuse it for free.
+For example there is a function forM that we make great use of that
+is a generic monadic loop, and for any thing that forms a monad
+ever will be able to use this piece of code. The next step Applicative
+is an important structure for expressing computation, and represents
+contextual computations where the arguments are contextual but do
+not have sequential contraints. Monads are the most interesting
+abstraction here and provide a computational context, and sequencing.
+
+Monads also have the added property that they are an type algebraic way
+to annotate effects. The Haskell `do` notation is a simple sugar over
+the Monadic operations (>>=), and (>>).
+
+### Concurrency
+
+Haskell has great builtin support for concurrency. They provide a scheduler
+and runtime for lightweight threads. This makes it really easy to manage
+concurrency, and makes the overhead of creating another thread very low.
+[^control-concurrent]
+
+### Parallelism
 
 Through this experimentation there has been a few interesting outcomes. Simon
 Marlow a principle researcher and maintainers of Haskell and has spent much of
@@ -53,18 +116,10 @@ his time making Haskell a viable language for parallel evaluation and parallel
 computation. There main evolutions has been the light weight threading and
 scheduling primitives like MVars, Chan, speculative parallelism in the form
 of the parallel library, and basic primitives for parallelism such as sparks.
+[^pnc-marlow] [^parallel-research].
 
-### Purity
+### Stream Fusion
 
-### Laziness
-
-### Monads
-
-
-## COMBINATORIAL_BLAS
-We are in the same space
-COMBINATORIAL_BLAS [^1]
-Ideas from CombBlas, and quad trees.
 
 # Quad tree
 We took ideas from _ that inspired our quad tree representation, this is
@@ -74,12 +129,18 @@ tackle the problem initially.
 
 # Related Work
 
-## CombBLas and KDT
+There is quite a bit of related work providing simple APIs for
+highly performant matrix operations. The prior work on this idea helped
+inform and guide our research, experimentation and implementation.
+
+## COMBINATORIAL_BLAS
+We are in the same space
+COMBINATORIAL_BLAS [^combblas]
 Ideas from CombBlas, and quad trees.
 
 ## Repa
-Repa was very interesting to us because of its novel approach to
-stream fusion. A technique that allows the compiler to fuse loop bodies into
+Repa is an interesting because its novel approach to array representation and
+stream fusion. This technique allows the compiler to fuse loop bodies into
 single iterations over a structure (in this an array), coupled with their
 multiple array representations which allow the programmer to specify how new
 arrays are computed, copied, ect. We fortunately learned a lot from
@@ -90,19 +151,14 @@ approach to the project.
 Having spent a lot of time attempting to implement our project on top of
 Repa we decided to change gears. We began investigating different sparse
 representations and looking around in the literature to see what had been tried.
-We spent a chunk of time investigating space filling curves and we feel that
-they will play an important role in our eventual distribution of matrices.
+
+## Sparse Matrices in Haskell
 At the same time we discovered that Edward Kmett an active member of the Haskell
 community had recently been working on a derivation of sparse matrices as well.
 He has employed some interesting ideas from space filling curves, and has a nice
 prototype. We decided to piggy back on his efforts and use them as a base for
 improving upon. This also enabled us to give back to the OpenSource community
 as well as finish our project.
-
-## Accelerate
-Info on it
-
-## Sparse
 Edward's initial prototype of the matrices were missing some keys pieces so we added
 them. We first spent some time updating the test suites so that we
 case validate the correctness of our implementation. Next we got a benchmark suite
@@ -112,12 +168,25 @@ compares the performance. Our main intention was to have sparse matrices that
 work well in the sequential, parallel, and distributed setting and Edward's only
 work sequentially.
 
-## Dense
+## Dense Matrices in Haskell
+For dense matrices there is `hmatrix` a Haskell wrapper around LAPACK, BLAS, and GSL.
+This seems to be the most mature matrix library in Haskell, and provides correct,
+efficient operations on dense matrices. [^hmatrix]
 
-# Contributions
-- high level points
-- longer description
-- new ideas
+# Design
+
+Our eventual design was focused on using quad trees as our distributed
+representation. We picked it as our mechanism for distributing matrix chunks
+as it provided easy reasoning about the distribution of a matrix, and allowed
+for us to write SIMD operations.
+
+We wanted to be able to do SIMD style operations so that it was easy for
+the eventual programmer to write algorithms without having to worry about
+the low level details. Part of the way we did this was with a Monad that
+represented distributed computations. This both allowed us to differentiate
+local operations from distributed operations, but also hide the plumbing
+of the distribution from the user.
+
 
 # Implementation
 
@@ -126,11 +195,17 @@ work sequentially.
 - mvars, chans, light-weight threads
 -
 
+Our implementation has three key components:
+  - distribution, and serialization
+  - representation
+  - operations
+
 ## Distribution
 
 - must solve some basic distributed system problems
 - quote papers
 
+- SIMD approach, computations on matrices must be completely distributed
 Another challenge we faced was how to coordinate between all the nodes
 participating in the computation. We figured out how MPI does this through
 the careful coordination of environment variables and other per node system
@@ -143,16 +218,26 @@ since it is not as simple as the dense case where we just even partition it.
 
 ## Representation
 
+As we mentioned above we used a quad tree representation for our distributed
+matrices, but we had to handle the distinction between locally present
+(i.e concrete) matrices vs. ones that were located on remote machines. Our
+representation split out our representation into two different types.
+Concrete ones:
+
+```haskell
+```
+
+We then used them
 - quad tree, recursive
 - concrete vs. distributed
-- SIMD approach, computations on matrices must be completely distributed
 - specialized representation and specialized operation
 - experiment with fusion/delayed representation
 
 ## Operations
 
+- SIMD approach, computations on matrices must be completely distributed
 - multiple, transpose, ect all fall out easily and recursively thanks to repr,
-and syncronization prims
+and synchronization prims
 
 # Evaluation
 
@@ -173,19 +258,33 @@ compiler for it, the set up a system for compiling and deploying code.
 This allows us to easily build and test code locally then transplant
 it to Triton for further testing and benchmarks.
 
+We were able to both get a copy of GHC (Our Haskell compiler) on to Triton.
+Allowing code to be run and deployed one Triton. We then piggy backed on MPI's
+infrastructure
+
+# Future Work
+
+We built a very simple message passing system for enabling process communication
+across nodes, but we hope to be able to bring more process synchronization,
+and communication primitives to it. Currently we treat processes as distinct
+entities regardless of whether they running locally or remotely. It would be
+better to treat work allocation as a per machine quantity and use threads locally
+instead of distinct processes. We began by attempting to
+implementing parallel operations on matrices by using a thread gang to
+have each operation as parallel as possible. We took this idea from Repa, and
+it would be good to be able to bring this parallel power down to the individual
+matrix level. Initially we thought it was impossible to shoehorn a sparse
+matrix into repa, we think that it would now be possible, and if not, at least
+adapting the approaches taken in Repa to our concrete matrix representation,
+and
+
 # Conclusion
 
-In terms of milestones related directly to the project we have finished two
-important pieces that are essential to finishing the project we have
-established a base representation based on matrices in morton order. We have
-figured out how to both run code and deploy code on Triton as well as figuring
-out how to piggy back on MPI's in place information for distribution.
-We have laid the ground work for the parallel and distributed versions. We have
-begun implementing parallel operations over the matrices by using a thread gang
-to have each operation as parallel as possible. We do this by spawning one fixed
-sized gang at the beginning of every computation and using it for all subsequent
-computations. This allows for us to get optimal use out of the machine without
-trashing the cache and incurring context switches for multiple gangs. For the
+When compared to our original milestones we accomplished the important ones.
+We assembled the essential pieces needed to perform both dense and sparse
+matrix operations serially. We built on finishing the project we have
+established a base representation based on matrices in morton order. We were
+able to both run and compile code on Triton.  For the
 distributed part we have taken some of the expertise we gained implementing
 Paxos in Haskell the previous quarter and applying to our matrices. We have
 build a simple system for communicating pieces of a data structure to a
@@ -196,4 +295,14 @@ nature of this makes implementing the pieces separately very easy. We also suspe
 a significant amount of time will be spent tuning our final implementation
 for optimal performance
 
-[^1]: http://gauss.cs.ucsb.edu/~aydin/CombBLAS/html/
+[^combblas]: http://gauss.cs.ucsb.edu/~aydin/CombBLAS/html/
+[^acclerate]: http://hackage.haskell.org/package/accelerate
+[^sparse]: https://github.com/ekmett/sparse
+[^fpcomplete]: https://www.fpcomplete.com/user/edwardk/revisiting-matrix-multiplication
+[^streamfusion]: http://metagraph.org/papers/stream_fusion.pdf
+[^haskell-best-c]: http://research.microsoft.com/en-us/um/people/simonpj/papers/ndp/haskell-beats-C.pdf
+[^control-concurrent]: http://www.haskell.org/ghc/docs/7.6.2/html/libraries/base/Control-Concurrent.html
+[^history-of-haskell]: http://research.microsoft.com/en-us/um/people/simonpj/papers/history-of-haskell/history.pdf
+[^pnc-marlow]: http://chimera.labs.oreilly.com/books/1230000000929/index.html
+[^parallel-research]: http://www.haskell.org/haskellwiki/Research_papers/Parallelism_and_concurrency
+[^hmatrix]: https://github.com/albertoruiz/hmatrix
