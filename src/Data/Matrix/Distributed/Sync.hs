@@ -28,7 +28,7 @@ requestMatrix :: MElement a => DT.PID -> Arg -> [Q] -> Requests a (DMat a)
 requestMatrix pid dir quad = do
     !(chan, mvar) <- R.ask
     lift $ DT.sendTo pid (Request dir quad)
-    lift $ lift $ print "sent"
+    -- lift $ lift $ print "sent"
     lift $ lift $ modifyMVar_ mvar (\m ->return $ Map.adjust (+1) pid m)
     !cmat <- lift $ lift $ Chan.readChan chan
     return $ Concrete cmat
@@ -38,7 +38,7 @@ respondMatrix !cmat process = DT.writeP process (Response cmat)
 
 sync :: MElement a => (DMat a, DMat a) -> Requests a b -> Distribute (DMatMessage a) b
 sync args requests = do
-    lift $ print "starting sync"
+    -- lift $ print "starting sync"
     (pid, reg) <- S.get
     procs <- lift $ DT.processes' reg
     let numOfProcs = length procs
@@ -49,10 +49,10 @@ sync args requests = do
 
     -- setup responders to handle incoming messages
     lift $ setupResponders pid chan args procs semaphore requests_left done_lock
-    lift $ print "runing!"
+    -- lift $ print "runing!"
     -- run monadic action
     !result <- runReaderT requests (chan, requests_left)
-    lift $ print "done running"
+    -- lift $ print "done running"
     lift $ modifyMVar_ done_lock (\_ -> return True) -- done running our monadic computation
     DT.broadcast Finish
     lift $ Sem.wait semaphore (numOfProcs)
@@ -64,10 +64,10 @@ setupResponders pid chan (l, r) procs sem req_var done_lock =
       forkIO $ Sem.with sem 1 (respondLoop p k)
   where respondLoop process k = do
           !msg <- DT.readP process
-          print $ show pid ++ " got " ++ show msg
+          -- print $ show pid ++ " got " ++ show msg
           case msg of
             Finish -> do
-              print $ show pid ++ " finished"
+              -- print $ show pid ++ " finished"
               go
               where
                 go = do
@@ -82,7 +82,7 @@ setupResponders pid chan (l, r) procs sem req_var done_lock =
                             modifyMVar_ req_var (\m -> return $ Map.adjust (\x -> x-1) k m)
                             Chan.writeChan chan cmat
                           Request dir index -> do
-                            print $ show pid ++ "responding"
+                            -- print $ show pid ++ "responding"
                             case dir of
                               L -> respondMatrix (traverseMat l index) process
                               R -> respondMatrix (traverseMat r index) process
@@ -94,7 +94,7 @@ setupResponders pid chan (l, r) procs sem req_var done_lock =
               Chan.writeChan chan cmat
               respondLoop process k
             Request dir index -> do
-              print $ show pid ++ "responding"
+              -- print $ show pid ++ "responding"
               case dir of
                 L -> respondMatrix (traverseMat l index) process
                 R -> respondMatrix (traverseMat r index) process
