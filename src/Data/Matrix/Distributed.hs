@@ -26,7 +26,7 @@ import qualified Data.Map as Map
 
 compute :: (MElement a) => DT.PID -> [(DT.PID, String, Int)] -> Distribute (DMatMessage a) () -> IO ()
 compute pid procs action = do
-    a <- newMVar ()
+    -- a <- newMVar ()
     forM_ procs $ \(pid1, host1, port1) -> do
       when (pid1 == pid) $ do
         -- putStrLn $ show pid1 ++ " starting up on " ++ host1 ++ ":" ++ show port1
@@ -39,12 +39,12 @@ compute pid procs action = do
           forM_ procs $ \(pid2, host2, port2) -> do
             lift $ print (pid1, pid2)
             when (pid2 < pid1) $ do
-              -- lift $ putStrLn $ (show pid1) ++ " trying to connect to " ++ show pid2 ++ "  " ++ host2 ++ ":" ++ show port2
+              lift $ putStrLn $ (show pid1) ++ " trying to connect to " ++ show pid2 ++ "  " ++ host2 ++ ":" ++ show port2
               let connect = catchIOError (DT.open host2 port2) (\_ -> do
                                                                         lift $ threadDelay 1000
                                                                         connect)
               connect
-              -- lift $ print $ show pid1 ++ " connected to " ++ show pid2
+              lift $ print $ show pid1 ++ " connected to " ++ show pid2
               return ()
             return ()
           -- lift $ putStrLn $ show pid ++ " is setup"
