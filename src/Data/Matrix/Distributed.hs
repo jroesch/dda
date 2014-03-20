@@ -33,19 +33,20 @@ compute pid procs action = do
         let state = (pid1, reg)
         putStrLn "At thread start"
         forkIO $ do
-          takeMVar a
+          -- takeMVar a
           DT.runDistribute state $ do
             DT.start port1 (DT.registerIncoming state)
+            lift $ threadDelay 1000
             forM_ procs $ \(pid2, host2, port2) -> do
               lift $ print (pid1, pid2)
               when (pid2 < pid1) $ do
                 lift $ print $ (show pid1) ++ " trying to connect to " ++ (show pid2)
                 DT.open host2 port2
+                lift $ print $ show pid1 ++ " connected to " ++ show pid2
                 return ()
               lift $ putStrLn "Letting go"
-            lift $ putMVar a ()
+            -- lift $ putMVar a ()
             lift $ putStrLn "Running Action"
-            lift $ threadDelay 1000
             action
             lift $ putStrLn "Done Action"
             return ()
@@ -54,7 +55,7 @@ compute pid procs action = do
 startProcess = undefined
 
 topleft :: (MElement a) => DMat a -> Distribute (DMatMessage a) a
-topleft m = sync (m, m) (unsafeTopLeft m)
+topleft !m = sync (m, m) (unsafeTopLeft m)
   where
     unsafeTopLeft :: (MElement a) => DMat a -> Requests a a
     unsafeTopLeft (Concrete (Dense smat)) = return $ smat @@> (0,0)
@@ -62,7 +63,7 @@ topleft m = sync (m, m) (unsafeTopLeft m)
                                               in return $ if H.null list then 0 else snd $ list H.! 0
     unsafeTopLeft (Concrete Zero) = return 0
     unsafeTopLeft r @ (Remote pid quad) = do
-        mat <- requestMatrix pid L quad
+        !mat <- requestMatrix pid L quad
         unsafeTopLeft mat
     unsafeTopLeft (DMat _ smat _ _ _) = unsafeTopLeft smat
 
