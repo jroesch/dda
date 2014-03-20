@@ -4,39 +4,46 @@
 # Introduction
 
 In deciding on a topic for our project was hard as we wanted something interesting,
-and challenging so that there would be sufficient motivation for continuing with
+and challenging. We wanted there to be sufficient motivation for continuing with
 it in the future. Given our backgrounds and interest in functional languages, we
-wanted to bring them together into a single project. We felt that
-matrix multiplication in necessary piece of many scientific applications.
-Therefor targeting matrices would help one write algorithms for
-many parallel computing problems. This impression was reinforced both
-from the material in the class, and our previous experiences with
-scientific computing.  
+wanted to do something that brought together ideas from programming languages,
+optimization, and functional programming in a single project.
 
-  As we discussed in our original proposal the goal of our project was to enable
-both parallel and distributed matrix operations in Haskell. We enjoy dragging
-as much theory as possible back into the "real world" and see if we can apply it.
-We copied this approach from the author of sparse who tried to do that with
-sparse matrix representation.
-implementation of parallel and distributed sparse matrices in Haskell. With the
+As we evaluated different ideas it quickly became obvious that matrix
+multiplication is a critical piece to solving many problems.
+Therefor targeting matrices would be incredibly useful enabling one
+to write algorithms a large set of linear algebra problems, and by
+extension Linear Algebra problems. This impression was reinforced both
+from the material we covered in the class, and our previous experiences with
+scientific computing.
 
-Our primary
-contribution will be the engineering effort of required to correctly implement
-parallel and distributed matrices themselves. We chose Haskell because we
-wanted to strike a balance between abstraction and performance.
-Overall our goals have not changed much, but we have dramatically
-changed our strategy to realize them. We originally thought that
-Repa, a Haskell library for parallel arrays, would be the core of our project
-but we have abandoned it after realizing that Repa's design is
-centered around dense arrays and would make be awkward to shoehorn sparse
-arrays into Repa. This happens to be the case because Repa is designed around
-dense arrays and much of its optimizations would not benefit sparse ones
-without significant changes to the code.
+As we discussed in our original proposal the goal of our project was to enable
+both parallel and distributed matrix operations in Haskell. We chose Haskell
+because we wanted to strike a balance between abstraction and performance. It
+is good for this for a few reasons:  
+
+  - very powerful optimizer
+  - ability to write low level code
+  - type safe ptrs
+  - history of optimization
+  - mature networking and collection libraries
+
+We also enjoy dragging as much theory as possible back into the "real world"
+and see if we can apply it solve useful problems. We copied this approach from the
+author of sparse who attempts to do this asm much as possible with the projects he works on.
+
+We used this as a guide for building the component pieces of our project.
+
+Our primary contribution is the engineering effort to correctly implement
+distributed matrices themselves in Haskell. The rest of the paper is dedicated
+to our research in this area, our implementation efforts, and our evaluation
+of what we finished by the end of the quarter.
 
 # Background
 
-Haskell programmers are few and far between so we choose to spend time
-elaborating the features of Haskell that helped us most in our implementation.
+Haskell programmers are few and far between so we want to highlight
+the reasons we choose Haskell and the features that helped us most in our
+implementation.
 
 ## Haskell
 Haskell the language began as a though experiment of taking a pure, lazy language
@@ -138,7 +145,21 @@ We are in the same space
 COMBINATORIAL_BLAS [^combblas]
 Ideas from CombBlas, and quad trees.
 
+The Combinatorial BLAS is an extensible distributed-memory
+parallel graph library offering a small but powerful set of
+linear algebra primitives specifically targeting graph analytics.
+
+
 ## Repa
+
+We originally thought that
+Repa, a Haskell library for parallel arrays, would be the core of our project
+but we have abandoned it after realizing that Repa's design is
+centered around dense arrays and would make be awkward to shoehorn sparse
+arrays into Repa. This happens to be the case because Repa is designed around
+dense arrays and much of its optimizations would not benefit sparse ones
+without significant changes to the code.
+
 Repa is an interesting because its novel approach to array representation and
 stream fusion. This technique allows the compiler to fuse loop bodies into
 single iterations over a structure (in this an array), coupled with their
