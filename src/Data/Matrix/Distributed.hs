@@ -34,7 +34,7 @@ compute pid procs action = do
         -- putStrLn "At thread start"
         DT.runDistribute state $ do
           DT.start port1 (DT.registerIncoming state)
-          lift $ threadDelay 100000
+          lift $ threadDelay 10000000
           forM_ procs $ \(pid2, host2, port2) -> do
             lift $ print (pid1, pid2)
             when (pid2 < pid1) $ do
@@ -43,7 +43,7 @@ compute pid procs action = do
               -- lift $ print $ show pid1 ++ " connected to " ++ show pid2
               return ()
             return ()
-          lift $ threadDelay 100000
+          lift $ threadDelay 10000000
           -- lift $ putStrLn $ show pid ++ " is setup"
           -- lift $ putStrLn "Running Action"
           action
