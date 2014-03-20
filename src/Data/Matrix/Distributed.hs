@@ -57,7 +57,7 @@ compute pid procs action = do
         return ()
   where
     waitEveryone = do
-          (_, reg) <- S.get
+          (_, DT.Registry reg) <- S.get
           r <- lift $ readMVar reg
           if Map.size r == length procs - 1
             then return ()
