@@ -52,8 +52,7 @@ executable triton_bench
     dda,
     split,
     mtl,
-    network,
-    timeit
+    network
   default-language:
         Haskell2010
 
