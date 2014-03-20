@@ -41,6 +41,7 @@ compute pid procs action = do
             when (pid2 < pid1) $ do
               lift $ putStrLn $ (show pid1) ++ " trying to connect to " ++ show pid2 ++ "  " ++ host2 ++ ":" ++ show port2
               let connect = catchIOError (DT.open host2 port2) (\_ -> do
+                                                                        lift $ putStrLn "reconnecting"
                                                                         lift $ threadDelay 1000
                                                                         connect)
               connect
