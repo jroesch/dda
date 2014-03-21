@@ -230,15 +230,14 @@ community had recently been working on a derivation of sparse matrices as well.
 He has employed some interesting ideas from space filling curves, and has a nice
 prototype. We decided to piggy back on his efforts and use them as a base for
 improving upon. This also enabled us to give back to the OpenSource community
-as well as finish our project.
+in the process.
+
 Edward's initial prototype of the matrices were missing some keys pieces so we added
 them. We first spent some time updating the test suites so that we
 case validate the correctness of our implementation. Next we got a benchmark suite
-running so that we can accurately chart the performance of our code as we evolve it.
-The benchmark suite tests multiple configurations of sparse against the BLAS and
-compares the performance. Our main intention was to have sparse matrices that
-work well in the sequential, parallel, and distributed setting and Edward's only
-work sequentially.
+running so that we can accurately chart the performance of our code as we evolved it.
+The benchmark suite tests multiple configurations of sparse against BLAS and
+compares the performance. This of course being the sequential case for matrices.
 
 ## Dense Matrices in Haskell
 For dense matrices there is `hmatrix` a Haskell wrapper around LAPACK, BLAS, and GSL.
