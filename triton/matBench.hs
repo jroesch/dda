@@ -33,7 +33,7 @@ main = do
       !m' <- mat .* mat
       end <- lift $ getCPUTime
       let diff = (fromIntegral (end - start)) / (10^12)
-      lift $ printf "Computation time: %0.3f sec\n" (diff :: Double)
+      lift $ printf "Computation time: %0.6f sec\n" (diff :: Double)
       return ()
     putStrLn "DONE __________"
     return ()
