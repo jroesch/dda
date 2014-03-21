@@ -79,7 +79,7 @@ constructIdent' s id n off side = case n of
     n' = n `div` 4
 
 constructIdentR :: MElement a => Int -> Int -> Int -> DMat a
-constructIdent s id n = constructIdentR' (fromIntegral s) (fromIntegral id) (fromIntegral n) 0 []
+constructIdentR s id n = constructIdentR' (fromIntegral s) (fromIntegral id) (fromIntegral n) 0 []
 
 -- construct a matrix of size s x s
 constructIdentR'' s id n off side = mat
