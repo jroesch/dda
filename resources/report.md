@@ -415,10 +415,12 @@ bumping up the input size. Resultantly we couldn't get running on
 matrices pasts sizes of 40,000 as the program hung and continued
 running many minutes past the time it took to do 40,000.
 
-Before we ran into the the performance issue we were running the same size
-problem with different numbers of nodes, but we saw no difference at all.
-Signaling to us that the multiplication was dominating the runtime and
-not the communication time.
+![Scaling Performance](graph.png)
+
+Included is a graph of performance on relatively small sized matrices (20,000 non-zeros).
+Performance is optimal at two nodes, most likely because we have high
+communication overhead. However, from 4 nodes to 16 nodes, our matrix
+multiplication scales relatively well.
 
 Overall we feel that our subpar performance was due to a couple possible problem
 areas:
