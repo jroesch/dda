@@ -28,7 +28,7 @@ main = do
     putStrLn "Starting up"
     Just n <- lookupEnv "NUMBER"
     compute rank procs $ do
-      let !(mat :: DMat Double) = constructMat (read n) rank size
+      let !(mat :: DMat Double) = constructIdent (read n) rank size
       start <- lift $ getCPUTime
       !m' <- mat .* mat
       end <- lift $ getCPUTime

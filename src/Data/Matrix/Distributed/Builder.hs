@@ -47,6 +47,37 @@ constructMat' s id n off side = case n of
   where
     n' = n `div` 4
 
+constructIdent :: MElement a => Int -> Int -> Int -> DMat a
+constructIdent s id n = constructMat' (fromIntegral s) (fromIntegral id) (fromIntegral n) 0 []
+
+-- construct a matrix of size s x s
+constructIdent'' s id n off side = mat
+  where
+    mat = case id of
+            0 -> DMat 1 (Concrete $ Sparse $ S.ident s) (Remote (off' + 1) b_) (Remote (off' + 2) c_) (Remote (off' + 3) d_)
+            1 -> DMat 2 (Remote (off' + 0) a_) (Concrete $ Sparse $ S.ident s) (Remote (off' + 2) c_) (Remote (off' + 3) d_)
+            2 -> DMat 4 (Remote (off' + 0) a_) (Remote (off' + 1) b_) (Concrete $ Sparse $ S.ident s) (Remote (off' + 3) d_)
+            3 -> DMat 8 (Remote (off' + 0) a_) (Remote (off' + 1) b_) (Remote (off' + 2) c_) (Concrete $ Sparse $ S.ident s)
+    a_ = side ++ [A]
+    b_ = side ++ [B]
+    c_ = side ++ [C]
+    d_ = side ++ [D]
+    off' = fromIntegral off
+    n' = floor $ sqrt $ fromIntegral n
+
+constructIdent' s id n off side = case n of 
+                            4 | id >= off && id < off + n -> constructIdent'' s (id-(fromIntegral off)) n (fromIntegral off) side
+                            4 -> DMat 15 (Remote (fromIntegral off) (side ++ [A]))
+                                         (Remote ((fromIntegral off) + 1) (side ++ [B]))
+                                         (Remote ((fromIntegral off) + 2) (side ++ [C]))
+                                         (Remote ((fromIntegral off) + 3) (side ++ [D]))
+                            _ -> DMat 15 (constructIdent' s id n' (off) (side ++ [A]))
+                                         (constructIdent' s id n' (off + n') (side ++ [B]))
+                                         (constructIdent' s id n' (off + 2*n') (side ++ [C]))
+                                         (constructIdent' s id n' (off + 3*n') (side ++ [D]))
+  where
+    n' = n `div` 4
+
 constructVec :: MElement a => Int -> Int -> Int -> DMat a
 constructVec s id n = constructVec' (fromIntegral s) id n 0 []
 
