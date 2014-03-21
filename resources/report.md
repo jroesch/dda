@@ -3,8 +3,8 @@
 
 # Introduction
 
-In deciding on a topic for our project was hard as we wanted something interesting,
-and challenging. We wanted there to be sufficient motivation for continuing with
+Deciding on a topic for our project was hard as we wanted something that was both
+interesting,and challenging. We wanted there to be sufficient motivation for continuing with
 it in the future. Given our backgrounds and interest in functional languages, we
 wanted to do something that brought together ideas from programming languages,
 optimization, and functional programming in a single project.
@@ -55,17 +55,39 @@ parallel performance.
 
 ### Purity
 Purity is one of the initially puzzling features of Haskell. It
-provides some important properties:  
-
-    - referentially transparent
-    - immutable data structures
-    - no global state  
+provides some important properties by being pure. We are now able
+to draw the distinction between procedures and functions. In Haskell
+every function is in fact a function (i.e a mapping from domain to
+codomain) and is only determined from its arguments. This means we
+have some nice properties like referential transparency meaning
+we can always substitue a function body for a function invocation
+while maintain correctness. This means that reasoning about function
+invocation and flow of control becomes simple as pure functions
+cannot mutate their input parameters. Purity also means that
+data structures are immutable by default, as once they are
+constructed there is no way to modify them. This also means
+that there is no global state reducing the ability for the programmer
+to write programs that rely on fragile global initialization.
 
 ### Laziness
 Laziness is another important property of Haskell that allows us to express
 a level of control over evaluation that is not normally available to a
-programmer.
+programmer. It enables us to easily write algorithms that compose, and
+evaluate things like the computation of an expensive list in parallel.
+For example:
 
+```haskell
+expensiveComputation = ...
+
+main = do
+  expensiveList <- sequence $ replicate 100000 expensiveCompuation
+  forM_ (partition 1000 expensiveList) $ forkIO \piece ->
+    return $ deepseq piece
+```
+
+This allows us to build a really computationally expensive list of possibilities
+and then distribute the work across multiple threads, since the evaluation
+doesn't happent until deepseq.
 
 ### Monads
 
@@ -74,7 +96,7 @@ code quickly and correctly. Monads are a structure from Category Theory
 but in practice are a useful abstraction (design pattern) for writing
 functional code. Monads are built upon two other simple primitives Functor,
 and Applicative. Haskell has a concept of "type classes" which are open
-interfaces that can be implemented at any time, by any type. Each has a simpe
+interfaces that can be implemented at any time, by any type. Each has a simple
 definition that is provided below.
 
 ```haskell
@@ -127,12 +149,31 @@ of the parallel library, and basic primitives for parallelism such as sparks.
 
 ### Stream Fusion
 
+Stream fusion is a technique for automatic deforestation or the removal of
+unnecessary intermediate data structures. This is very effective in Haskell
+as we can safely rewrite these operations without worrying about correctness.
+One can accomplish stream fusion by transforming sequences into a stream type
+and applying functions the streams instead of the original data structure.
+We then provide GHC a rewrite rule that describes how to rewrite multiple
+stream operations into a single one. A simple fusion rule is the one for map:
+
+```
+map f . map g = map (f . g)
+```
+
+This means that we can transform most operations on sequences into a single
+invocation of stream, and unstream, meaning we only apply the fused operations
+to each element precisely once. Increasing the constant factors of our code
+by quite a bit. There are quite a few papers on this, but the most well known
+is Coutts et al[^streamfusion] with further improvements from
+Mainland et al[^haskell-best-c].
 
 # Quad tree
 We took ideas from _ that inspired our quad tree representation, this is
 something that could be possibly tweaked but it seemed like a good way to
 tackle the problem initially.
 
+Tristan can you write some words here?
 
 # Related Work
 
@@ -191,35 +232,59 @@ work sequentially.
 
 ## Dense Matrices in Haskell
 For dense matrices there is `hmatrix` a Haskell wrapper around LAPACK, BLAS, and GSL.
-This seems to be the most mature matrix library in Haskell, and provides correct,
+This seemed to be the most mature matrix library in Haskell, and provides correct,
 efficient operations on dense matrices. [^hmatrix]
 
 # Design
 
 Our eventual design was focused on using quad trees as our distributed
-representation. We picked it as our mechanism for distributing matrix chunks
+representation. We choose it our mechanism for distributing matrix chunks
 as it provided easy reasoning about the distribution of a matrix, and allowed
-for us to write SIMD operations.
+for us to write SIMD operations. There are some limitations that we haven't
+solved such as doing uneven distribution, and dealing with a custom
+representation for rectangular matrices (for now we can treat them as
+a sparse square matrix).
 
-We wanted to be able to do SIMD style operations so that it was easy for
-the eventual programmer to write algorithms without having to worry about
-the low level details. Part of the way we did this was with a Monad that
-represented distributed computations. This both allowed us to differentiate
-local operations from distributed operations, but also hide the plumbing
-of the distribution from the user.
+This design helped us do SIMD style operations, which was important to us
+because we wanted the algorithm author be able to use the operations
+without having to worry about the low level details. The quad tree made this
+easy because we were able to specify which parts each process had to do
+computation for without having to deal with specialized representations.
 
+The other tool that helped was the use of a Monad to encapsulate the
+bookkeeping necessary to deal with interprocess communication, and the book
+keeping needed for the distributed monad to work. This also allowed
+for us to differentiate between local computations, distributed computations,
+and ones that required requests, while all keeping it hidden from the user.
+
+For example our multiplication on matrices simply boiled down to these lines
+for dealing with remote pieces:
+
+```haskell
+dmult' l @ (Remote pid quad) mat = do
+    !lmat <- requestMatrix pid L quad
+    dmult' lmat mat
+dmult' mat r @ (Remote pid quad) = do
+    !rmat <- requestMatrix pid R quad
+    dmult' mat rmat
+```
 
 # Implementation
 
-- general approach, tried a few alternatives
-- in HS, ,different pieces, primitives provided by HS
-- mvars, chans, light-weight threads
--
+We first considered a few different approaches to implementing our project,
+from binding to MPI, to using Cloud Haskell, and more. These all seemed like
+more complicated approaches so we decided to use implement our own framework
+in order to do message passing.
 
-Our implementation has three key components:
-  - distribution, and serialization
-  - representation
-  - operations
+As we discussed in our related worked we used many of the primitives in Haskell
+to great effect. In particular we used `MVar`s, `Chan`s and Haskell's light
+weight thread primitives.
+
+Our implementation can be broke into three key components:  
+
+- distribution, and serialization
+- representation
+- operations
 
 ## Distribution
 
@@ -239,26 +304,91 @@ since it is not as simple as the dense case where we just even partition it.
 
 ## Representation
 
-As we mentioned above we used a quad tree representation for our distributed
-matrices, but we had to handle the distinction between locally present
-(i.e concrete) matrices vs. ones that were located on remote machines. Our
-representation split out our representation into two different types.
-Concrete ones:
+As we discussed in our related work and design, and related work we decided
+upon using a quad tree representation in our distributed matrices.
+
+In the process of implementation we decided that we wanted to enforce a
+stratification between concrete and distributed matrices so we split our
+original data type definition into two separate types. One for concrete
+and one for distributed.
+
+This actually turned out to be a big win, as we were able to rewrite our
+operations on concrete matrices to be total functions, and specialize
+then just for the concrete (Zero, Sparse, Dense cases) meaning we didn't
+have to have failure conditions for something that shouldn't fail like
+matrix multiplication.
+
+We then were able to write simpler algorithms for the distributed cases.
+
+Our concrete representation:
 
 ```haskell
+data CMat a = Dense (D.Matrix a)
+            | Sparse (S.Mat a)
+            | Zero
+            deriving (Show, Generic)
 ```
 
-We then used them
-- quad tree, recursive
-- concrete vs. distributed
-- specialized representation and specialized operation
-- experiment with fusion/delayed representation
+The distributed case:
+```haskell
+data DMat a = DMat !Int !(DMat a) !(DMat a) !(DMat a) !(DMat a)
+            | Remote !DT.PID ![Q]
+            | Concrete !(CMat a)
+            deriving (Show, Generic)
+```
+
+We also made the simplifying assumption that all of our leaves are the same
+size meaning we didn't have to deal with odd multiplication cases. We can
+build recursive algorithms that were easy to reason about.
+
+We implemented some very simply fusion for the concrete multiplication cases
+allowing us to optimize that case, but we did not end up having as much time
+to experiment with distributed fusion.
 
 ## Operations
 
-- SIMD approach, computations on matrices must be completely distributed
-- multiple, transpose, ect all fall out easily and recursively thanks to repr,
-and synchronization prims
+The foundation we used for implementing distributed computations was `sync`
+which allowed us to synchronize computation around a piece of data and
+require the distributed system to reach a consistent global state before
+continuing. `sync` also require our computation to be expressed in a
+Requests monad which makes it explicit that the computation  
+needs outside information.
+
+Since we took a SIMD approach the operations provided by our library are
+very easy to use and work much like normal operations, except they live in our
+computational context that represents distributed computations.
+This was nice because some operations like transpose did not need to be
+distributed and we were able to reflect that in our type signature like so:
+
+```haskell
+transpose :: (S.Arrayed a) => DMat a -> DMat a
+transpose (Concrete (Dense smat)) = Concrete $ Dense $ D.trans smat
+transpose (Concrete (Sparse smat)) = Concrete $ Sparse $ S.transpose smat
+transpose (Concrete Zero) = Concrete Zero
+transpose (Remote pid quad) =
+    case quad of
+      [B] -> Remote pid [C]
+      [C] -> Remote pid [B]
+      a -> Remote pid a
+transpose (DMat mask tl tr bl br) =
+    DMat (mask' mask) (transpose tl) (transpose bl)
+                      (transpose tr) (transpose br)
+  where
+    mask' m = (m .&. 1) + (m .&. 8) +
+              (if thirdQ m then 1 else 0)*2 +
+              (if secondQ m then 1 else 0)*4
+```
+If you look carefully you will see that we can do this transpose on any process
+without needing to communicate.
+
+Implementing new operations is quite easy, especially if they are composed of
+our primitive ones. For example our implementation of `ddot` for conjugate
+gradient was very simple:
+
+```haskell
+ddot :: DMat Double -> DMat Double -> Distribute (DMatMessage Double) Double
+ddot x y = (transpose x) .* y >>= topleft
+```
 
 # Evaluation
 
@@ -301,20 +431,19 @@ and
 
 # Conclusion
 
-When compared to our original milestones we accomplished the important ones.
-We assembled the essential pieces needed to perform both dense and sparse
-matrix operations serially. We built on finishing the project we have
-established a base representation based on matrices in morton order. We were
-able to both run and compile code on Triton.  For the
-distributed part we have taken some of the expertise we gained implementing
-Paxos in Haskell the previous quarter and applying to our matrices. We have
-build a simple system for communicating pieces of a data structure to a
-distributed computation and will build upon that to write high level distributed
-versions of our operations that decompose into locally parallel operations, that
-then decompose into the sequential versions on a per thread basis. The recursive
-nature of this makes implementing the pieces separately very easy. We also suspect
-a significant amount of time will be spent tuning our final implementation
-for optimal performance
+When looking at our original milestones we accomplished the important ones.
+We assembled the essential pieces needed to experiment, and optimize a
+framework for doing matrix operations. We implemented routines for
+working with both dense and sparse matrices serially. We built on an existing
+open source library and improved a the implementation of the sparse matrices.
+For distribution we have taken the expertise we gained implementing
+Paxos in Haskell and applied it our implementation efforts this quarter.
+We have built a simple system for communicating pieces of a data structure to
+each process, but there is huge room for improvement in optimizing the overhead
+of message passing. We are pleased at how our representation decomposes recursively
+as it allowed us to implement the pieces separately very easy.
+We were able to both run and compile code on Triton, and demonstrate that we
+were at least able to achieve some of our initial performance goals.
 
 [^combblas]: http://gauss.cs.ucsb.edu/~aydin/CombBLAS/html/
 [^acclerate]: http://hackage.haskell.org/package/accelerate
@@ -327,3 +456,4 @@ for optimal performance
 [^pnc-marlow]: http://chimera.labs.oreilly.com/books/1230000000929/index.html
 [^parallel-research]: http://www.haskell.org/haskellwiki/Research_papers/Parallelism_and_concurrency
 [^hmatrix]: https://github.com/albertoruiz/hmatrix
+[^quadtree]: https://para08.idi.ntnu.no/docs/submission_155.pdf
