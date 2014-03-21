@@ -116,7 +116,15 @@ class (Applicative m) => Monad m where
 This declares that for thing that for a Functor f if you provide me a
 transformation from a f parametrized by a to one parametrized by b.
 For example IO (the Monad representing input/output effects) forms
-a Functor: `fmap (+1) [1,2,3] == [2,3,4]`. Type classes allows one
+a Functor, for example fmap allows us to transform an action which produces
+a string into one that produces an integer.
+
+```haskell
+readInt :: IO Int
+readInt = fmap read getLine
+```
+
+that reads a string into one that reads an integerType classes allows one
 to write generic code over these interfaces and reuse it for free.
 For example there is a function forM that we make great use of that
 is a generic monadic loop, and for any thing that forms a monad
@@ -170,19 +178,20 @@ Mainland et al[^haskell-best-c].
 
 # Quadtree
 We spent time reading the literature on using space filling curves for matrix
-representation, and developed quite a few intresting insights about the problems.
+representation, and developed quite a few interesting insights about the problems.
 Bader and Heinecke[^quadtree] proposed using a block-recusive deconstruction of the
-matrix odered on peano curves, where eaach level is divided into nine blocks.
-We found this to be an elegant construction which would allow us to have a 
-recursive data type with of leaf nodes of varying type. 
+matrix ordered on peano curves, where each level is divided into nine blocks.
+We found this to be an elegant construction which would allow us to have a
+recursive data type with of leaf nodes of varying type.
 
 Each of these leaves could be handled by an external library, so we wouldn't
 have to reimplement concrete matrix primitives. Furthermore, it allowed us to structure
-our matrix algorithms  recursively which is a natural fit for Haskell. 
+our matrix algorithms  recursively which is a natural fit for Haskell.
 The original purpose of the peano ordering was to increase cache locality.
 However, since we are distributing our matrix across multiple nodes, it received
-negligable benifit from the peano ordering. 
-Once we dropped the peano ordering, it made more sense to use a quadtree 
+negligible benefit from the peano ordering.
+
+Once we dropped the peano ordering, it made more sense to use a quadtree
 because it was simpler to use for our purposes, and so we replaced the
 three by three representation described in the paper, with the quadtree.
 
@@ -195,21 +204,18 @@ inform and guide our research, experimentation and implementation.
 ## COMBINATORIAL_BLAS
 We are in the same space Combinatorial BLAS [^combblas], which is a
 distributed-memory parallel graph library that is very much trying to solve
-the same sorts of problems we were tackling. It provides a set of linear algebra primitives 
+the same sorts of problems we were tackling. It provides a set of linear algebra primitives
 that are specifically useful for targeting graph analytics.
 
 ## Repa
 
-Repa insipired our project greatly and we thought initally that we would use it
-as the core of our project.
-Repa, a Haskell library for parallel arrays, would be the core of our project
-but we have abandoned it after realizing that Repa's design is
-centered around dense arrays and would make be awkward to shoehorn sparse
-arrays into Repa. This happens to be the case because Repa is designed around
-dense arrays and much of its optimizations would not benefit sparse ones
-without significant changes to the code.
+Repa inspired our project greatly and we thought initially that we would use it
+as the core of our project. Repa is Haskell library for parallel arrays,
+would have be the core of our project, but we have abandoned it after
+realizing that Repa's design was centered around dense arrays and would
+make be awkward to shoehorn sparse arrays into Repa.
 
-Repa is an interesting because its novel approach to array representation and
+Repa was interesting because its novel approach to array representation and
 stream fusion. This technique allows the compiler to fuse loop bodies into
 single iterations over a structure (in this an array), coupled with their
 multiple array representations which allow the programmer to specify how new
@@ -217,10 +223,6 @@ arrays are computed, copied, ect. We fortunately learned a lot from
 studying Repa's design so the time was not a complete waste. As well general
 processes described in the authors' papers have helped inform our overall
 approach to the project.
-
-Having spent a lot of time attempting to implement our project on top of
-Repa we decided to change gears. We began investigating different sparse
-representations and looking around in the literature to see what had been tried.
 
 ## Sparse Matrices in Haskell
 At the same time we discovered that Edward Kmett an active member of the Haskell
@@ -296,19 +298,18 @@ Our implementation can be broke into three key components:
 
 ## Distribution
 
-- must solve some basic distributed system problems
-- quote papers
+We built a small framework for distributed processes that allowed for easy, well
+ordered communication between processes. This allowed for us to spin up a bunch
+of proceses with just a few lines of code, and build all of our abstractions
+on top of this.
 
-- SIMD approach, computations on matrices must be completely distributed
-Another challenge we faced was how to coordinate between all the nodes
-participating in the computation. We figured out how MPI does this through
-the careful coordination of environment variables and other per node system
-settings, and reverse engineered it for our purposes. We are going to rely on
-this information to coordinate the distribution of work across the nodes. We are
-experimenting with using a space filling curve to determine how to split the
-data. There are some potential challenges here with properly chunking the work
-since it is not as simple as the dense case where we just even partition it.
-
+This framework only supported the concept of a registry, a set of processes
+that are registered, and ways to communicate between them. We used these
+primitives to implement some common distributed systems algorithms for
+reaching consistent global states. We used these algorithms to ensure that
+system synced up at the operation boundaries in order to maintain
+the correctness of our operations, without a system is vulnerable to race
+conditions that would result incorrect answers.
 
 ## Representation
 
@@ -400,26 +401,51 @@ ddot x y = (transpose x) .* y >>= topleft
 
 # Evaluation
 
-- graphs!!?!?1
-
-Our primary method of whether this is a success will be taking our current
-benchmark suite and scaling both the input sizes and number of cores. For us
-a performance win will showing significant speed up in the parallel and
-distributed setting. In order to show this for a large number of cores and nodes
-we really felt that we needed Triton to show our scaling. We have been running
-locally but 8 cores is not enough to accurately discuss our results.
-
-In order to do this we needed to be able to run Haskell code on Triton. The
-first important piece important piece we nailed down was how to run Haskell
-on Triton.We did a little bit of investigation and determined that the OS and
-architecture of the super computer. We built a version of the Glasgow Haskell
-compiler for it, the set up a system for compiling and deploying code.
-This allows us to easily build and test code locally then transplant
-it to Triton for further testing and benchmarks.
-
 We were able to both get a copy of GHC (Our Haskell compiler) on to Triton.
-Allowing code to be run and deployed one Triton. We then piggy backed on MPI's
-infrastructure
+Allowing code to be easily run and deployed one Triton, with little extra
+effort. We also piggy backed on MPI's existing infrastructure for communication
+to allow us to run on more than Triton node for benchmarking.
+
+Our method of benchmarking our implementation was very simple: did it scale?
+
+We got our system running on Triton and were able to benchmark it, but the
+results showed that we still needed to do more performance tuning in
+order to get it truly competitive. We also encountered a bizarre bug in
+which the program seemed to transform from running fine to hanging after
+bumping up the input size. Resultantly we couldn't get running on
+matrices pasts sizes of 40,000 as the program hung and continued
+running many minutes past the time it took to do 40,000.
+
+Before we ran into the the performance issue we were running the same size
+problem with different numbers of nodes, but we saw no difference at all.
+Signaling to us that the multiplication was dominating the runtime and
+not the communication time.
+
+Overall we feel that our subpar performance was due to a couple possible problem
+areas:
+
+- serialization
+- redundant data fetches
+- too many messages
+- compiler annotations, and tricks
+
+For serialization we quickly enabled serialization for all of the required
+data types, but we didn't invest significant time into optimizing this, and it
+may of cost us extra precious time on top of our other inefficiencies.
+
+We did not have time to implement a batched request system and so we were
+probably unnecessarily fetching data more than once meaning wasted time
+in communication, and serialization.
+
+We used a simple algorithm for synchronizing processes, and we probably could
+of used a more sophisticated scheme such as those used in Dynamo or Riak.
+
+We used the simple annotations, and tricks for performance in Haskell, but it
+is likely there are more we could apply to our code.
+
+We were disappointed that we couldn't see our matrices scale to bigger input
+size because our only real result was the communication overhead was too high
+and ended up slowing us down much more than expected.
 
 # Future Work
 
