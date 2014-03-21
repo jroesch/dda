@@ -168,23 +168,23 @@ by quite a bit. There are quite a few papers on this, but the most well known
 is Coutts et al[^streamfusion] with further improvements from
 Mainland et al[^haskell-best-c].
 
-# Quad tree
-We took ideas from _ that inspired our quad tree representation, this is
-something that could be possibly tweaked but it seemed like a good way to
-tackle the problem initially.
-
+# Quadtree
+We spent time reading the literature on using space filling curves for matrix
+representation, and developed quite a few intresting insights about the problems.
 Bader and Heinecke[^quadtree] proposed using a block-recusive deconstruction of the
-matrix odered on peano curves. Each level is divided into nine blocks.
-We found this construction to be very elegant
-and decided to use it. It allows us to have different varieties of leaf block.
+matrix odered on peano curves, where eaach level is divided into nine blocks.
+We found this to be an elegant construction which would allow us to have a 
+recursive data type with of leaf nodes of varying type. 
+
 Each of these leaves could be handled by an external library, so we wouldn't
-have to reimplement matrix primitives. Furthermore, it allowed us to structure
-our matrix operations in a recursive format. The original purpose of the peano
-ordering was to increase cache locality. However, we are distributing our matrix
-across multiple nodes, and would recieve a negligable benifit from the peano
-ordering. Once we dropped the peano ordering, we decided we might as well use a
-quadtree instead of the three by three described in the paper. A quadtree is
-easier to handle in code.
+have to reimplement concrete matrix primitives. Furthermore, it allowed us to structure
+our matrix algorithms  recursively which is a natural fit for Haskell. 
+The original purpose of the peano ordering was to increase cache locality.
+However, since we are distributing our matrix across multiple nodes, it received
+negligable benifit from the peano ordering. 
+Once we dropped the peano ordering, it made more sense to use a quadtree 
+because it was simpler to use for our purposes, and so we replaced the
+three by three representation described in the paper, with the quadtree.
 
 # Related Work
 
@@ -193,18 +193,15 @@ highly performant matrix operations. The prior work on this idea helped
 inform and guide our research, experimentation and implementation.
 
 ## COMBINATORIAL_BLAS
-We are in the same space
-COMBINATORIAL_BLAS [^combblas]
-Ideas from CombBlas, and quad trees.
-
-The Combinatorial BLAS is an extensible distributed-memory
-parallel graph library offering a small but powerful set of
-linear algebra primitives specifically targeting graph analytics.
-
+We are in the same space Combinatorial BLAS [^combblas], which is a
+distributed-memory parallel graph library that is very much trying to solve
+the same sorts of problems we were tackling. It provides a set of linear algebra primitives 
+that are specifically useful for targeting graph analytics.
 
 ## Repa
 
-We originally thought that
+Repa insipired our project greatly and we thought initally that we would use it
+as the core of our project.
 Repa, a Haskell library for parallel arrays, would be the core of our project
 but we have abandoned it after realizing that Repa's design is
 centered around dense arrays and would make be awkward to shoehorn sparse
