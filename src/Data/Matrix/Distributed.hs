@@ -279,6 +279,8 @@ dmult !l !r = sync (l, r) (dmult' l r)
   where 
     dmult' (Concrete cmat1) (Concrete cmat2) =
         return $ Concrete $ smult cmat1 cmat2
+    dmult' (Concrete Zero) _ = return $ Concrete Zero
+    dmult' _ (Concrete Zero) = return $ Concrete Zero
     dmult' l @ (Remote pid quad) mat = do
         !lmat <- requestMatrix pid L quad
         dmult' lmat mat
