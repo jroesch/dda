@@ -55,8 +55,8 @@ constructIdent'' s id n off side = mat
   where
     mat = case id of
             0 -> DMat 1 (Concrete $ Sparse $ S.ident s) (Remote (off' + 1) b_) (Remote (off' + 2) c_) (Remote (off' + 3) d_)
-            1 -> DMat 2 (Remote (off' + 0) a_) (Concrete Zero) (Remote (off' + 2) c_) (Remote (off' + 3) d_)
-            2 -> DMat 4 (Remote (off' + 0) a_) (Remote (off' + 1) b_) (Concrete Zero) (Remote (off' + 3) d_)
+            1 -> DMat 2 (Remote (off' + 0) a_) (Concrete $ Sparse $ S.ident s) (Remote (off' + 2) c_) (Remote (off' + 3) d_)
+            2 -> DMat 4 (Remote (off' + 0) a_) (Remote (off' + 1) b_) (Concrete $ Sparse $ S.ident s) (Remote (off' + 3) d_)
             3 -> DMat 8 (Remote (off' + 0) a_) (Remote (off' + 1) b_) (Remote (off' + 2) c_) (Concrete $ Sparse $ S.ident s)
     a_ = side ++ [A]
     b_ = side ++ [B]
