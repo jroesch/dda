@@ -48,7 +48,7 @@ constructMat' s id n off side = case n of
     n' = n `div` 4
 
 constructIdent :: MElement a => Int -> Int -> Int -> DMat a
-constructIdent s id n = constructMat' (fromIntegral s) (fromIntegral id) (fromIntegral n) 0 []
+constructIdent s id n = constructIdent' (fromIntegral s) (fromIntegral id) (fromIntegral n) 0 []
 
 -- construct a matrix of size s x s
 constructIdent'' s id n off side = mat
@@ -77,6 +77,37 @@ constructIdent' s id n off side = case n of
                                          (constructIdent' s id n' (off + 3*n') (side ++ [D]))
   where
     n' = n `div` 4
+
+constructIdentR :: MElement a => Int -> Int -> Int -> DMat a
+constructIdent s id n = constructIdentR' (fromIntegral s) (fromIntegral id) (fromIntegral n) 0 []
+
+-- construct a matrix of size s x s
+constructIdentR'' s id n off side = mat
+  where
+    mat = case id of
+            0 -> DMat 3 (Concrete $ Sparse $ S.ident s) (Concrete Zero) (Remote (off' + 1) c_) (Remote (off' + 1) d_)
+            1 -> DMat 12 (Remote (off' + 0) a_) (Remote (off' + 0) b_) (Concrete Zero) (Concrete $ Sparse $ S.ident s)
+    a_ = side ++ [A]
+    b_ = side ++ [B]
+    c_ = side ++ [C]
+    d_ = side ++ [D]
+    off' = fromIntegral off
+    n' = floor $ sqrt $ fromIntegral n
+
+constructIdentZ s id off side = DMat 15 (Concrete Zero) (Concrete Zero) (Concrete Zero) (Concrete Zero)
+
+constructIdentR' s id n off side = case n of 
+                            2 | id >= off && id < off + n -> constructIdentR'' s (id-(fromIntegral off)) n (fromIntegral off) side
+                            2 -> DMat 15 (Remote (fromIntegral off) (side ++ [A]))
+                                         (Remote ((fromIntegral off) ) (side ++ [B]))
+                                         (Remote ((fromIntegral off) + 1) (side ++ [C]))
+                                         (Remote ((fromIntegral off) + 1) (side ++ [D]))
+                            _ -> DMat 15 (constructIdentR' s id n' (off) (side ++ [A]))
+                                         (constructIdentR' s id n' (off + n') (side ++ [B]))
+                                         (constructIdentR' s id n' (off + 2*n') (side ++ [C]))
+                                         (constructIdentR' s id n' (off + n') (side ++ [D]))
+  where
+    n' = n `div` 2
 
 constructVec :: MElement a => Int -> Int -> Int -> DMat a
 constructVec s id n = constructVec' (fromIntegral s) id n 0 []
