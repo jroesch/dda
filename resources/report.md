@@ -173,7 +173,18 @@ We took ideas from _ that inspired our quad tree representation, this is
 something that could be possibly tweaked but it seemed like a good way to
 tackle the problem initially.
 
-Tristan can you write some words here?
+Bader and Heinecke[^quadtree] proposed using a block-recusive deconstruction of the
+matrix odered on peano curves. Each level is divided into nine blocks.
+We found this construction to be very elegant
+and decided to use it. It allows us to have different varieties of leaf block.
+Each of these leaves could be handled by an external library, so we wouldn't
+have to reimplement matrix primitives. Furthermore, it allowed us to structure
+our matrix operations in a recursive format. The original purpose of the peano
+ordering was to increase cache locality. However, we are distributing our matrix
+across multiple nodes, and would recieve a negligable benifit from the peano
+ordering. Once we dropped the peano ordering, we decided we might as well use a
+quadtree instead of the three by three described in the paper. A quadtree is
+easier to handle in code.
 
 # Related Work
 
