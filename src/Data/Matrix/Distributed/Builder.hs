@@ -79,7 +79,7 @@ constructIdent' s id n off side = case n of
     n' = n `div` 4
 
 constructIdentR :: MElement a => Int -> Int -> Int -> DMat a
-constructIdentR s id n = constructIdentR' (fromIntegral s) (fromIntegral id) (fromIntegral n) 0 []
+constructIdentR s id n = constructIdentR' (fromIntegral s) (fromIntegral id) (fromIntegral n) 0 [] False
 
 -- construct a matrix of size s x s
 constructIdentR'' s id n off side = mat
@@ -94,18 +94,19 @@ constructIdentR'' s id n off side = mat
     off' = fromIntegral off
     n' = floor $ sqrt $ fromIntegral n
 
-constructIdentZ s id off side = DMat 15 (Concrete Zero) (Concrete Zero) (Concrete Zero) (Concrete Zero)
+constructIdentZ = DMat 15 (Concrete Zero) (Concrete Zero) (Concrete Zero) (Concrete Zero)
 
-constructIdentR' s id n off side = case n of 
+constructIdentR' s id n off side bool = case n of 
+                            2 | bool -> constructIdentZ 
                             2 | id >= off && id < off + n -> constructIdentR'' s (id-(fromIntegral off)) n (fromIntegral off) side
                             2 -> DMat 15 (Remote (fromIntegral off) (side ++ [A]))
                                          (Remote ((fromIntegral off) ) (side ++ [B]))
                                          (Remote ((fromIntegral off) + 1) (side ++ [C]))
                                          (Remote ((fromIntegral off) + 1) (side ++ [D]))
-                            _ -> DMat 15 (constructIdentR' s id n' (off) (side ++ [A]))
-                                         (constructIdentR' s id n' (off + n') (side ++ [B]))
-                                         (constructIdentR' s id n' (off + 2*n') (side ++ [C]))
-                                         (constructIdentR' s id n' (off + n') (side ++ [D]))
+                            _ -> DMat 15 (constructIdentR' s id n' (off) (side ++ [A]) bool)
+                                         (constructIdentR' s id n' (off + n') (side ++ [B]) True)
+                                         (constructIdentR' s id n' (off + 2*n') (side ++ [C]) True)
+                                         (constructIdentR' s id n' (off + n') (side ++ [D]) bool)
   where
     n' = n `div` 2
 
