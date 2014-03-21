@@ -22,7 +22,7 @@ both parallel and distributed matrix operations in Haskell. We chose Haskell
 because we wanted to strike a balance between abstraction and performance. It
 is good for this for a few reasons:  
 
-  - very powerful optimizer
+  - powerful optimizer
   - ability to write low level code
   - type safe ptrs
   - history of optimization
